@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] - 2026-08-29
+
+### Fixed
+- **Filter List Auto-Save Race Condition:** Fixed dashboard startup race condition where early `setMode()` execution triggered auto-save before filter lists were hydrated from disk, preventing `blacklist` / `whitelist` from being cleared on launch.
+- **Form Save & Filter Rule Isolation:** Decoupled preference saves (Hub address, autostart, clear delay) from filter rules so general setting updates never tamper with or overwrite program blocklists.
+- **Session Event Listener Deduplication:** Replaced app name deduplication with session instance ID (`id(session)`) in `MediaListener`, ensuring event listeners are attached cleanly when video players or browsers destroy and recreate WinRT sessions across episodes or tracks.
+- **Known Application Names:** Added friendly name definitions for `Plex`, `MPV`, and `Fladder`.
+
+---
+
 ## [0.3.1] - 2026-08-29
 
 ### Fixed

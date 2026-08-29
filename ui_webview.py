@@ -635,7 +635,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- 5. Footer -->
   <div class="footer">
     <div class="footer-left">
-      <span class="version-label" id="verLabel">v0.3.1</span>
+      <span class="version-label" id="verLabel">v0.3.2</span>
       <a class="config-link" id="configPathLabel" onclick="openConfigFolder()" title="Click to open config folder">Config: config.json</a>
     </div>
     <span id="toastMsg" class="toast">Saved ✓</span>
@@ -654,14 +654,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     const DEFAULT_ART = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAAOUlEQVR42u3OQQ0AAAgEILV/Z2nhexswCegqKioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKg8W+yEA95gZ154AAAAASUVORK5CYII=";
     document.getElementById('coverArt').src = DEFAULT_ART;
 
-    function setMode(mode) {
+    function setMode(mode, save = true) {
       currentMode = mode;
       document.getElementById('modeHub').className = 'segmented-btn ' + (mode === 'hub' ? 'active' : '');
       document.getElementById('modeDirect').className = 'segmented-btn ' + (mode === 'direct' ? 'active' : '');
-      autoSave();
+      if (save) {
+        autoSave();
+      }
     }
 
-    function setFilterMode(mode) {
+    function setFilterMode(mode, save = true) {
       if (mode === 'blacklist') mode = 'block';
       if (mode === 'whitelist') mode = 'allow';
       currentFilterMode = mode;
@@ -687,7 +689,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         guide.innerText = 'All detected media programs are currently allowed to sync.';
       }
 
-      if (window.pywebview && window.pywebview.api) {
+      if (save && window.pywebview && window.pywebview.api) {
         window.pywebview.api.set_filter_mode(mode);
       }
       renderAppsList();
@@ -810,8 +812,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         hub_url: document.getElementById('hubUrl').value.trim(),
         mode: currentMode,
         filter_mode: currentFilterMode,
-        whitelist: currentAllowedList,
-        blacklist: currentBlockedList,
         enabled: document.getElementById('chkSync').checked,
         start_in_tray: document.getElementById('chkStartInTray').checked,
         autostart: document.getElementById('chkAutostart').checked,
@@ -929,20 +929,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     window.addEventListener('pywebviewready', async () => {
       if (window.pywebview && window.pywebview.api) {
         const init = await window.pywebview.api.get_initial_state();
-        document.getElementById('hubUrl').value = init.config.hub_url;
-        document.getElementById('chkSync').checked = init.config.enabled;
-        document.getElementById('chkStartInTray').checked = init.config.start_in_tray;
-        document.getElementById('chkAutostart').checked = init.config.autostart;
-        delayVal = init.config.clear_delay || 2.0;
-        document.getElementById('clearDelay').value = delayVal.toFixed(1) + 's';
-        setMode(init.config.mode || 'hub');
-        document.getElementById('verLabel').innerText = 'v' + init.version;
-
         currentFilterMode = init.config.filter_mode || 'off';
         currentAllowedList = init.config.allowed_apps || init.config.whitelist || [];
         currentBlockedList = init.config.blocked_apps || init.config.blacklist || [];
         currentDetectedApps = init.config.detected_apps || {};
-        setFilterMode(currentFilterMode);
+        currentMode = init.config.mode || 'hub';
+        delayVal = init.config.clear_delay || 2.0;
+
+        document.getElementById('hubUrl').value = init.config.hub_url || '';
+        document.getElementById('chkSync').checked = Boolean(init.config.enabled);
+        document.getElementById('chkStartInTray').checked = Boolean(init.config.start_in_tray);
+        document.getElementById('chkAutostart').checked = Boolean(init.config.autostart);
+        document.getElementById('clearDelay').value = delayVal.toFixed(1) + 's';
+        document.getElementById('verLabel').innerText = 'v' + init.version;
+
+        setMode(currentMode, false);
+        setFilterMode(currentFilterMode, false);
+        renderAppsList();
 
         if (init.config_path) {
           document.getElementById('configPathLabel').innerText = 'Config: ' + (init.config_filename || 'config.json');
@@ -1008,10 +1011,6 @@ class WebViewApi:
             self.config.clear_delay = float(data.get("clear_delay", self.config.clear_delay))
         if "filter_mode" in data:
             self.config.filter_mode = str(data.get("filter_mode", self.config.filter_mode))
-        if "blacklist" in data:
-            self.config.blacklist = list(data.get("blacklist", self.config.blacklist))
-        if "whitelist" in data:
-            self.config.whitelist = list(data.get("whitelist", self.config.whitelist))
 
         self.config.save()
 

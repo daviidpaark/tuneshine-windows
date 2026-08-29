@@ -164,7 +164,7 @@ class MediaListener:
         if not session:
             return
         try:
-            session_id = session.source_app_user_model_id or str(id(session))
+            session_id = str(id(session))
             if session_id in self._attached_session_ids:
                 return
             session.add_media_properties_changed(self._on_media_properties_changed)

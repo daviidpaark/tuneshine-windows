@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -40,6 +40,12 @@ KNOWN_APP_NAMES = {
     "deezer.exe": "Deezer",
     "musicbee.exe": "MusicBee",
     "plezy.exe": "Plezy",
+    "plex.exe": "Plex",
+    "plex": "Plex",
+    "mpv.exe": "MPV",
+    "mpv": "MPV",
+    "fladder.exe": "Fladder",
+    "fladder": "Fladder",
     "cider.exe": "Cider (Apple Music)",
     "aimp.exe": "AIMP",
     "winamp.exe": "Winamp",

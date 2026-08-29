@@ -302,6 +302,24 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertIn("blocked_apps", init_state["config"])
             self.assertIn("detected_apps", init_state["config"])
 
+            # Test that saving general settings does not wipe existing blacklist/whitelist
+            cfg.set_app_filter_state("plezy.exe", "block")
+            self.assertIn("plezy.exe", cfg.blocked_apps)
+            res_save = api.save_settings({
+                "hub_url": "http://unraid:8585",
+                "mode": "hub",
+                "enabled": True,
+                "start_in_tray": True,
+                "autostart": True,
+                "clear_delay": 2.0,
+                "filter_mode": "block",
+            })
+            self.assertTrue(res_save["success"])
+            self.assertIn("plezy.exe", cfg.blocked_apps)
+            self.assertFalse(cfg.is_app_allowed("plezy.exe"))
+            self.assertFalse(cfg.is_app_allowed("Plezy.exe"))
+            self.assertFalse(cfg.is_app_allowed("plezy"))
+
     def test_media_listener_filter_callbacks(self):
         import tempfile
         from pathlib import Path
