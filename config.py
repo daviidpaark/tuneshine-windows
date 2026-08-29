@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -18,7 +18,86 @@ DEFAULT_CONFIG = {
     "clear_delay": 2.0,
     "service_name": "Spotify",
     "autostart": False,
+    "filter_mode": "off",  # "off", "blacklist", "whitelist"
+    "blacklist": [],
+    "whitelist": [],
+    "detected_apps": {},
 }
+
+KNOWN_APP_NAMES = {
+    "spotify.exe": "Spotify",
+    "spotify": "Spotify",
+    "chrome.exe": "Google Chrome",
+    "msedge.exe": "Microsoft Edge",
+    "firefox.exe": "Mozilla Firefox",
+    "brave.exe": "Brave Browser",
+    "opera.exe": "Opera",
+    "opera_gx.exe": "Opera GX",
+    "vivaldi.exe": "Vivaldi",
+    "vlc.exe": "VLC Media Player",
+    "foobar2000.exe": "foobar2000",
+    "tidal.exe": "TIDAL",
+    "deezer.exe": "Deezer",
+    "musicbee.exe": "MusicBee",
+    "plezy.exe": "Plezy",
+    "cider.exe": "Cider (Apple Music)",
+    "aimp.exe": "AIMP",
+    "winamp.exe": "Winamp",
+    "wmplayer.exe": "Windows Media Player",
+    "itunes.exe": "iTunes",
+    "discord.exe": "Discord",
+    "audacity.exe": "Audacity",
+    "telegram.exe": "Telegram",
+    "plexamp.exe": "Plexamp",
+    "dopamine.exe": "Dopamine",
+}
+
+
+def get_friendly_app_name(app_id: str) -> str:
+    """Translates a Windows App ID / exe name into a clean user-friendly name."""
+    if not app_id:
+        return "Unknown App"
+
+    clean_id = app_id.strip()
+    lower_id = clean_id.lower()
+
+    if lower_id in KNOWN_APP_NAMES:
+        return KNOWN_APP_NAMES[lower_id]
+
+    base_lower = Path(lower_id).name
+    if base_lower in KNOWN_APP_NAMES:
+        return KNOWN_APP_NAMES[base_lower]
+
+    stem_lower = Path(base_lower).stem
+    if stem_lower in KNOWN_APP_NAMES:
+        return KNOWN_APP_NAMES[stem_lower]
+
+    # UWP / Package Family Name heuristics
+    if "applemusic" in lower_id:
+        return "Apple Music"
+    if "zunemusic" in lower_id or "microsoft.zunemusic" in lower_id:
+        return "Windows Media Player"
+    if "spotify" in lower_id:
+        return "Spotify"
+    if "amazonmusic" in lower_id:
+        return "Amazon Music"
+    if "tidal" in lower_id:
+        return "TIDAL"
+
+    if "!" in clean_id:
+        part = clean_id.split("!")[0]
+        if "_" in part:
+            part = part.split("_")[0]
+        if "." in part:
+            part = part.split(".")[-1]
+        if part:
+            return part
+
+    name = Path(clean_id).name
+    if name.lower().endswith(".exe"):
+        name = name[:-4]
+
+    return name.replace("_", " ").replace("-", " ").strip().title()
 
 
 def get_config_dir() -> Path:
@@ -165,6 +244,179 @@ class Config:
                         pass
         except Exception as e:
             logger.error(f"Failed to update autostart registry: {e}")
+
+    @property
+    def filter_mode(self) -> str:
+        mode = str(self.data.get("filter_mode", DEFAULT_CONFIG["filter_mode"])).lower()
+        if mode == "blacklist":
+            return "block"
+        if mode == "whitelist":
+            return "allow"
+        return mode
+
+    @filter_mode.setter
+    def filter_mode(self, value: str):
+        val = str(value).strip().lower()
+        if val in ("blacklist", "block"):
+            val = "block"
+        elif val in ("whitelist", "allow"):
+            val = "allow"
+        else:
+            val = "off"
+        self.data["filter_mode"] = val
+        self.save()
+
+    @property
+    def blacklist(self) -> list:
+        return list(self.data.get("blacklist", DEFAULT_CONFIG["blacklist"]))
+
+    @blacklist.setter
+    def blacklist(self, value: list):
+        self.data["blacklist"] = list(value)
+        self.save()
+
+    @property
+    def blocked_apps(self) -> list:
+        return self.blacklist
+
+    @blocked_apps.setter
+    def blocked_apps(self, value: list):
+        self.blacklist = value
+
+    @property
+    def whitelist(self) -> list:
+        return list(self.data.get("whitelist", DEFAULT_CONFIG["whitelist"]))
+
+    @whitelist.setter
+    def whitelist(self, value: list):
+        self.data["whitelist"] = list(value)
+        self.save()
+
+    @property
+    def allowed_apps(self) -> list:
+        return self.whitelist
+
+    @allowed_apps.setter
+    def allowed_apps(self, value: list):
+        self.whitelist = value
+
+    @property
+    def detected_apps(self) -> dict:
+        return dict(self.data.get("detected_apps", DEFAULT_CONFIG["detected_apps"]))
+
+    @detected_apps.setter
+    def detected_apps(self, value: dict):
+        self.data["detected_apps"] = dict(value)
+        self.save()
+
+    def is_app_allowed(self, app_id: str) -> bool:
+        """Determines whether a media session from app_id is permitted based on current filter settings."""
+        if not app_id:
+            return True
+
+        mode = self.filter_mode
+        if mode in ("off", "none", "all"):
+            return True
+
+        def _match(rule: str, target_id: str) -> bool:
+            r = rule.strip().lower()
+            t = target_id.strip().lower()
+            if not r or not t:
+                return False
+            if r == t:
+                return True
+            r_base = Path(r).name.lower()
+            t_base = Path(t).name.lower()
+            if r_base == t_base or Path(r_base).stem == Path(t_base).stem:
+                return True
+            if r in t or t in r:
+                return True
+            return False
+
+        if mode in ("block", "blacklist"):
+            for blocked in self.blocked_apps:
+                if _match(blocked, app_id):
+                    return False
+            return True
+
+        if mode in ("allow", "whitelist"):
+            for allowed in self.allowed_apps:
+                if _match(allowed, app_id):
+                    return True
+            return False
+
+        return True
+
+    def register_detected_app(self, app_id: str, display_name: str = None) -> bool:
+        """Registers or updates an app in the detected_apps registry. Returns True if new/updated."""
+        if not app_id:
+            return False
+
+        clean_id = app_id.strip()
+        detected = dict(self.data.get("detected_apps", {}))
+
+        # Check if already present under same or normalized key
+        existing_key = None
+        for k in detected.keys():
+            if k.lower() == clean_id.lower():
+                existing_key = k
+                break
+
+        key = existing_key or clean_id
+        is_new = key not in detected
+
+        # If already registered and no custom display name change, do not rewrite disk
+        if not is_new and not display_name:
+            return False
+
+        resolved_display = display_name or detected.get(key, {}).get("display_name") or get_friendly_app_name(clean_id)
+
+        from datetime import datetime
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        detected[key] = {
+            "app_id": key,
+            "display_name": resolved_display,
+            "last_seen": now_str,
+        }
+        self.data["detected_apps"] = detected
+        self.save()
+        return is_new
+
+    def remove_detected_app(self, app_id: str):
+        """Removes an app from detected_apps and any blacklist/whitelist."""
+        if not app_id:
+            return
+        clean_id = app_id.strip().lower()
+
+        detected = {k: v for k, v in self.detected_apps.items() if k.strip().lower() != clean_id}
+        self.data["detected_apps"] = detected
+
+        self.data["whitelist"] = [x for x in self.whitelist if x.strip().lower() != clean_id]
+        self.data["blacklist"] = [x for x in self.blacklist if x.strip().lower() != clean_id]
+        self.save()
+
+    def set_app_filter_state(self, app_id: str, state: str):
+        """Sets an app's filter status: 'allow'/'whitelist', 'block'/'blacklist', or 'neutral'/'default'."""
+        if not app_id:
+            return
+        clean_id = app_id.strip()
+        lower_id = clean_id.lower()
+
+        self.register_detected_app(clean_id)
+
+        w_list = [x for x in self.whitelist if x.strip().lower() != lower_id]
+        b_list = [x for x in self.blacklist if x.strip().lower() != lower_id]
+
+        state_val = str(state).strip().lower()
+        if state_val in ("allow", "whitelist"):
+            w_list.append(clean_id)
+        elif state_val in ("block", "blacklist"):
+            b_list.append(clean_id)
+
+        self.data["whitelist"] = w_list
+        self.data["blacklist"] = b_list
+        self.save()
 
     def open_config_folder(self):
         """Opens the folder containing config.json in Windows Explorer."""

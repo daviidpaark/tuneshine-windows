@@ -30,12 +30,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     body {
       background-color: #0d0d10;
       color: #fafafa;
-      padding: 16px;
+      padding: 14px;
       height: 100vh;
-      overflow: hidden;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+    body::-webkit-scrollbar {
+      width: 6px;
+    }
+    body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    body::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
 
     /* Cards */
@@ -43,15 +56,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       background: #16161a;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
-      padding: 14px;
+      padding: 13px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #f4f4f5;
+      letter-spacing: 0.2px;
     }
 
     /* Now Playing Hero */
     .player-card {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 13px;
       background: linear-gradient(135deg, #18181f 0%, #121216 100%);
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
@@ -107,6 +132,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
     .badge-paused .badge-dot { background: #f59e0b; }
 
+    .badge-blocked {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .badge-blocked .badge-dot { background: #ef4444; }
+
     .badge-idle {
       background: rgba(255, 255, 255, 0.08);
       color: #a1a1aa;
@@ -117,6 +149,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     .source-text {
       font-size: 11px;
       color: #71717a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
     }
     .track-title {
       font-size: 13.5px;
@@ -139,7 +175,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       gap: 6px;
-      margin-bottom: 12px;
+      margin-bottom: 11px;
     }
     .form-group:last-child {
       margin-bottom: 0;
@@ -159,7 +195,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
       color: #fafafa;
-      font-size: 12.5px;
+      font-size: 12px;
       padding: 7px 10px;
       outline: none;
       transition: border-color 0.15s;
@@ -173,9 +209,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       cursor: pointer;
       border: none;
       border-radius: 8px;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
-      padding: 7px 14px;
+      padding: 6px 12px;
       transition: all 0.15s;
     }
     .btn-secondary {
@@ -199,7 +235,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       transform: scale(0.98);
     }
 
-    /* Segmented Mode Switcher */
+    /* Segmented Switcher */
     .segmented {
       display: flex;
       background: #0d0d10;
@@ -211,8 +247,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     .segmented-btn {
       flex: 1;
       text-align: center;
-      padding: 6px 10px;
-      font-size: 11.5px;
+      padding: 5px 8px;
+      font-size: 11px;
       font-weight: 500;
       color: #a1a1aa;
       border-radius: 6px;
@@ -224,6 +260,139 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       color: #fafafa;
       font-weight: 600;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Program Filtering Card Elements */
+    .filter-guide {
+      font-size: 11px;
+      color: #71717a;
+      line-height: 1.35;
+      margin-top: 3px;
+    }
+    .apps-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .apps-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #a1a1aa;
+      padding-bottom: 2px;
+    }
+    .apps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 185px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .apps-list::-webkit-scrollbar {
+      width: 5px;
+    }
+    .apps-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 3px;
+    }
+    .app-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0d0d10;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 7px 10px;
+      gap: 8px;
+      transition: border-color 0.15s;
+    }
+    .app-item:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .app-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      flex: 1;
+    }
+    .app-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fafafa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .app-id-sub {
+      font-size: 10px;
+      color: #71717a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .app-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .tag-btn {
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #a1a1aa;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .tag-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+    .tag-btn.tag-allow-active {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+      border-color: rgba(34, 197, 94, 0.45);
+    }
+    .tag-btn.tag-allow-active:hover {
+      background: rgba(34, 197, 94, 0.3);
+    }
+    .tag-btn.tag-block-active {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+    .tag-btn.tag-block-active:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+    .btn-delete {
+      background: transparent;
+      color: #52525b;
+      padding: 3px 6px;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+    .btn-delete:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+    .empty-apps {
+      text-align: center;
+      padding: 14px 8px;
+      font-size: 11px;
+      color: #71717a;
+      line-height: 1.4;
+    }
+    .add-app-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
     }
 
     /* Settings List Rows */
@@ -321,6 +490,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       justify-content: space-between;
       margin-top: auto;
       padding-top: 4px;
+      padding-bottom: 2px;
     }
     .footer-left {
       display: flex;
@@ -374,7 +544,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- 2. Connection Settings -->
+  <!-- 2. Program Filtering (Allow / Block) -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Program Filtering</div>
+      <span id="filterStatusBadge" class="badge badge-idle">ALLOW ALL (OFF)</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Filter Mode</label>
+      <div class="segmented">
+        <button id="modeFilterOff" class="segmented-btn active" onclick="setFilterMode('off')">Off (Allow All)</button>
+        <button id="modeFilterBlock" class="segmented-btn" onclick="setFilterMode('block')">Block Mode</button>
+        <button id="modeFilterAllow" class="segmented-btn" onclick="setFilterMode('allow')">Allow Mode</button>
+      </div>
+      <div id="filterGuideText" class="filter-guide">All detected media programs are currently allowed to sync.</div>
+    </div>
+
+    <div class="apps-section">
+      <div class="apps-header">
+        <span id="appsCountLabel">Detected Programs (0)</span>
+      </div>
+
+      <div id="appsList" class="apps-list">
+        <div class="empty-apps">No media programs detected yet.<br>Play audio in any app or add one manually below.</div>
+      </div>
+
+      <div class="add-app-row">
+        <input type="text" id="manualAppInput" placeholder="Add exe (e.g. cider.exe)" onkeydown="if(event.key==='Enter'){addManualApp();}">
+        <button class="btn-secondary" onclick="addManualApp()">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Connection Settings -->
   <div class="card">
     <div class="form-group">
       <label class="form-label">Target Hub Address</label>
@@ -393,7 +596,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- 3. Preferences -->
+  <!-- 4. Preferences -->
   <div class="card">
     <div class="setting-row">
       <span class="setting-label">Sync Playback</span>
@@ -429,10 +632,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- 4. Footer -->
+  <!-- 5. Footer -->
   <div class="footer">
     <div class="footer-left">
-      <span class="version-label" id="verLabel">v0.2.0</span>
+      <span class="version-label" id="verLabel">v0.3.0</span>
       <a class="config-link" id="configPathLabel" onclick="openConfigFolder()" title="Click to open config folder">Config: config.json</a>
     </div>
     <span id="toastMsg" class="toast">Saved ✓</span>
@@ -441,6 +644,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <script>
     let currentMode = "hub";
+    let currentFilterMode = "off";
+    let currentAllowedList = [];
+    let currentBlockedList = [];
+    let currentDetectedApps = {};
     let delayVal = 2.0;
 
     // Default 1x1 black square fallback
@@ -452,6 +659,136 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       document.getElementById('modeHub').className = 'segmented-btn ' + (mode === 'hub' ? 'active' : '');
       document.getElementById('modeDirect').className = 'segmented-btn ' + (mode === 'direct' ? 'active' : '');
       autoSave();
+    }
+
+    function setFilterMode(mode) {
+      if (mode === 'blacklist') mode = 'block';
+      if (mode === 'whitelist') mode = 'allow';
+      currentFilterMode = mode;
+
+      document.getElementById('modeFilterOff').className = 'segmented-btn ' + (mode === 'off' ? 'active' : '');
+      document.getElementById('modeFilterBlock').className = 'segmented-btn ' + (mode === 'block' ? 'active' : '');
+      document.getElementById('modeFilterAllow').className = 'segmented-btn ' + (mode === 'allow' ? 'active' : '');
+
+      const badge = document.getElementById('filterStatusBadge');
+      const guide = document.getElementById('filterGuideText');
+
+      if (mode === 'block') {
+        badge.className = 'badge badge-paused';
+        badge.innerText = 'BLOCK MODE';
+        guide.innerText = 'Programs marked as "Block" will be prevented from syncing.';
+      } else if (mode === 'allow') {
+        badge.className = 'badge badge-syncing';
+        badge.innerText = 'ALLOW MODE';
+        guide.innerText = 'Only programs marked as "Allow" will be permitted to sync.';
+      } else {
+        badge.className = 'badge badge-idle';
+        badge.innerText = 'ALLOW ALL (OFF)';
+        guide.innerText = 'All detected media programs are currently allowed to sync.';
+      }
+
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.set_filter_mode(mode);
+      }
+      renderAppsList();
+    }
+
+    function isAppInList(appId, list) {
+      if (!appId || !list) return false;
+      const lower = appId.toLowerCase();
+      return list.some(item => {
+        const itemLower = item.toLowerCase();
+        return itemLower === lower || lower.includes(itemLower) || itemLower.includes(lower);
+      });
+    }
+
+    function renderAppsList() {
+      const container = document.getElementById('appsList');
+      const keys = Object.keys(currentDetectedApps);
+      document.getElementById('appsCountLabel').innerText = `Detected Programs (${keys.length})`;
+
+      if (keys.length === 0) {
+        container.innerHTML = '<div class="empty-apps">No media programs detected yet.<br>Play audio in any app or add one manually below.</div>';
+        return;
+      }
+
+      let html = '';
+      keys.forEach(appId => {
+        const info = currentDetectedApps[appId];
+        const dispName = (info && info.display_name) || appId;
+        const isAllowed = isAppInList(appId, currentAllowedList);
+        const isBlocked = isAppInList(appId, currentBlockedList);
+
+        const allowBtnClass = isAllowed ? 'tag-btn tag-allow-active' : 'tag-btn';
+        const blockBtnClass = isBlocked ? 'tag-btn tag-block-active' : 'tag-btn';
+
+        const nextAllowState = isAllowed ? 'neutral' : 'allow';
+        const nextBlockState = isBlocked ? 'neutral' : 'block';
+
+        html += `
+          <div class="app-item">
+            <div class="app-info">
+              <div class="app-name">${escapeHtml(dispName)}</div>
+              <div class="app-id-sub" title="${escapeHtml(appId)}">${escapeHtml(appId)}</div>
+            </div>
+            <div class="app-actions">
+              <button class="${allowBtnClass}" title="Mark as Allowed" onclick="setAppFilter('${escapeHtml(appId)}', '${nextAllowState}')">Allow</button>
+              <button class="${blockBtnClass}" title="Mark as Blocked" onclick="setAppFilter('${escapeHtml(appId)}', '${nextBlockState}')">Block</button>
+              <button class="btn-delete" title="Remove program" onclick="removeApp('${escapeHtml(appId)}')">✕</button>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    async function setAppFilter(appId, state) {
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.set_app_filter_state(appId, state);
+        if (res && res.success) {
+          currentAllowedList = res.whitelist || res.allowed_apps || [];
+          currentBlockedList = res.blacklist || res.blocked_apps || [];
+          currentDetectedApps = res.detected_apps || currentDetectedApps;
+          renderAppsList();
+          showToast(`Updated ${appId}`);
+        }
+      }
+    }
+
+    async function addManualApp() {
+      const input = document.getElementById('manualAppInput');
+      const val = input.value.trim();
+      if (!val) return;
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.add_custom_app(val);
+        if (res && res.success) {
+          currentDetectedApps = res.detected_apps || currentDetectedApps;
+          currentAllowedList = res.whitelist || res.allowed_apps || currentAllowedList;
+          currentBlockedList = res.blacklist || res.blocked_apps || currentBlockedList;
+          input.value = '';
+          renderAppsList();
+          showToast(`Added ${val}`);
+        }
+      }
+    }
+
+    async function removeApp(appId) {
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.remove_app(appId);
+        if (res && res.success) {
+          currentDetectedApps = res.detected_apps || {};
+          currentAllowedList = res.whitelist || res.allowed_apps || [];
+          currentBlockedList = res.blacklist || res.blocked_apps || [];
+          renderAppsList();
+          showToast(`Removed ${appId}`);
+        }
+      }
     }
 
     function stepDelay(delta) {
@@ -472,6 +809,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       return {
         hub_url: document.getElementById('hubUrl').value.trim(),
         mode: currentMode,
+        filter_mode: currentFilterMode,
+        whitelist: currentAllowedList,
+        blacklist: currentBlockedList,
         enabled: document.getElementById('chkSync').checked,
         start_in_tray: document.getElementById('chkStartInTray').checked,
         autostart: document.getElementById('chkAutostart').checked,
@@ -529,6 +869,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
     }
 
+    // Called dynamically from Python when new apps are discovered
+    window.updateDetectedApps = function(data) {
+      if (!data) return;
+      if (data.detected_apps) currentDetectedApps = data.detected_apps;
+      if (data.whitelist) currentAllowedList = data.whitelist;
+      if (data.allowed_apps) currentAllowedList = data.allowed_apps;
+      if (data.blacklist) currentBlockedList = data.blacklist;
+      if (data.blocked_apps) currentBlockedList = data.blocked_apps;
+      if (data.filter_mode) currentFilterMode = data.filter_mode;
+      renderAppsList();
+    };
+
     // Called from Python on SMTC playback update
     window.updateTrackInfo = function(track) {
       const badge = document.getElementById('statusBadge');
@@ -549,6 +901,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         } else {
           art.src = DEFAULT_ART;
         }
+      } else if (track.is_blocked) {
+        badge.className = 'badge badge-blocked';
+        badgeText.innerText = 'BLOCKED';
+        sourceApp.innerText = track.app_id ? 'via ' + track.app_id.replace('.exe', '') + ' (Blocked)' : '';
+        title.innerText = track.title || 'Playback Blocked';
+        artist.innerText = (track.artist ? track.artist + ' • ' : '') + 'Blocked by filter rules';
+        art.src = DEFAULT_ART;
       } else {
         const isPaused = Boolean(track.title);
         badge.className = isPaused ? 'badge badge-paused' : 'badge badge-idle';
@@ -574,6 +933,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         document.getElementById('clearDelay').value = delayVal.toFixed(1) + 's';
         setMode(init.config.mode || 'hub');
         document.getElementById('verLabel').innerText = 'v' + init.version;
+
+        currentFilterMode = init.config.filter_mode || 'off';
+        currentAllowedList = init.config.allowed_apps || init.config.whitelist || [];
+        currentBlockedList = init.config.blocked_apps || init.config.blacklist || [];
+        currentDetectedApps = init.config.detected_apps || {};
+        setFilterMode(currentFilterMode);
 
         if (init.config_path) {
           document.getElementById('configPathLabel').innerText = 'Config: ' + (init.config_filename || 'config.json');
@@ -609,6 +974,12 @@ class WebViewApi:
                 "start_in_tray": self.config.start_in_tray,
                 "autostart": self.config.autostart,
                 "clear_delay": self.config.clear_delay,
+                "filter_mode": self.config.filter_mode,
+                "blacklist": self.config.blacklist,
+                "whitelist": self.config.whitelist,
+                "blocked_apps": self.config.blocked_apps,
+                "allowed_apps": self.config.allowed_apps,
+                "detected_apps": self.config.detected_apps,
             },
             "config_path": str(self.config.config_path),
             "config_filename": self.config.config_path.name,
@@ -631,11 +1002,61 @@ class WebViewApi:
             self.config.autostart = bool(data.get("autostart", self.config.autostart))
         if "clear_delay" in data:
             self.config.clear_delay = float(data.get("clear_delay", self.config.clear_delay))
+        if "filter_mode" in data:
+            self.config.filter_mode = str(data.get("filter_mode", self.config.filter_mode))
+        if "blacklist" in data:
+            self.config.blacklist = list(data.get("blacklist", self.config.blacklist))
+        if "whitelist" in data:
+            self.config.whitelist = list(data.get("whitelist", self.config.whitelist))
+
         self.config.save()
 
         self.hub_client.update_url(self.config.hub_url, mode=self.config.mode)
         self.on_config_changed()
         return {"success": True, "path": str(self.config.config_path)}
+
+    def set_filter_mode(self, mode: str):
+        self.config.filter_mode = mode
+        self.on_config_changed()
+        return {"success": True, "filter_mode": self.config.filter_mode}
+
+    def set_app_filter_state(self, app_id: str, state: str):
+        self.config.set_app_filter_state(app_id, state)
+        self.on_config_changed()
+        return {
+            "success": True,
+            "whitelist": self.config.whitelist,
+            "blacklist": self.config.blacklist,
+            "allowed_apps": self.config.allowed_apps,
+            "blocked_apps": self.config.blocked_apps,
+            "detected_apps": self.config.detected_apps,
+        }
+
+    def add_custom_app(self, app_id: str):
+        clean_id = app_id.strip()
+        if clean_id:
+            self.config.register_detected_app(clean_id)
+            self.on_config_changed()
+        return {
+            "success": True,
+            "detected_apps": self.config.detected_apps,
+            "whitelist": self.config.whitelist,
+            "blacklist": self.config.blacklist,
+            "allowed_apps": self.config.allowed_apps,
+            "blocked_apps": self.config.blocked_apps,
+        }
+
+    def remove_app(self, app_id: str):
+        self.config.remove_detected_app(app_id)
+        self.on_config_changed()
+        return {
+            "success": True,
+            "detected_apps": self.config.detected_apps,
+            "whitelist": self.config.whitelist,
+            "blacklist": self.config.blacklist,
+            "allowed_apps": self.config.allowed_apps,
+            "blocked_apps": self.config.blocked_apps,
+        }
 
     def open_config_folder(self):
         self.config.open_config_folder()
@@ -668,9 +1089,9 @@ class WebviewDashboard:
             title="Tuneshine Windows",
             html=HTML_TEMPLATE,
             js_api=self.api,
-            width=390,
-            height=545,
-            resizable=False,
+            width=420,
+            height=660,
+            resizable=True,
             hidden=hidden,
             background_color="#0d0d10",
         )
@@ -687,6 +1108,22 @@ class WebviewDashboard:
             self.window.show()
             self.window.restore()
 
+    def update_detected_apps(self):
+        if self.window:
+            try:
+                data = {
+                    "detected_apps": self.config.detected_apps,
+                    "filter_mode": self.config.filter_mode,
+                    "whitelist": self.config.whitelist,
+                    "blacklist": self.config.blacklist,
+                    "allowed_apps": self.config.allowed_apps,
+                    "blocked_apps": self.config.blocked_apps,
+                }
+                js_code = f"if (window.updateDetectedApps) {{ window.updateDetectedApps({json.dumps(data)}); }}"
+                self.window.evaluate_js(js_code)
+            except Exception as e:
+                logger.debug(f"Could not push detected apps to webview: {e}")
+
     def update_media(self, track: TrackInfo):
         art_b64 = ""
         if track.thumbnail_bytes:
@@ -694,6 +1131,7 @@ class WebviewDashboard:
 
         track_dict = {
             "is_playing": track.is_playing,
+            "is_blocked": getattr(track, "is_blocked", False),
             "title": track.title,
             "artist": track.artist,
             "album": track.album,

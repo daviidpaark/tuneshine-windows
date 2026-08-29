@@ -36,6 +36,12 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 - **Dual Operation Modes:**
   - **Tuneshine Hub (Offload Processing):** Passes raw cover art and metadata to a `tuneshine-hub` Docker instance, offloading WebP compression and multi-source arbitration.
   - **Direct to Device (Standalone):** Converts cover art to 64×64 lossless WebP locally via Pillow and speaks directly to physical Tuneshine hardware without requiring Docker.
+- **Streamlined Program Filtering (Allow & Block):**
+  - **Off (Allow All):** Every media player is permitted to sync (default).
+  - **Block Mode:** Block specific applications (e.g. Chrome, Edge, Discord, games) to prevent unwanted video/audio clips from hijacking your display.
+  - **Allow Mode:** Restrict sync strictly to approved music players (e.g. Spotify, Apple Music, Tidal).
+  - **Dynamic Program Discovery:** Detects and registers media programs in real-time as they open or play audio on Windows.
+  - **Smart Session Fallback:** If Windows' foreground app is filtered out, Tuneshine automatically discovers active background music players.
 - **Zero-Config Setup:** No Spotify Developer API keys, client secrets, or OAuth tokens needed.
 - **Instant Event-Driven Sync:** Pushes updates the moment a track starts, changes, or pauses (similar to Discord Music Presence engines).
 - **Artwork Hash Deduplication:** Eliminates redundant network calls for identical tracks or consecutive plays.

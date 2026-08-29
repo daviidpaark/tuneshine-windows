@@ -12,6 +12,25 @@ if (-not (Test-Path $SourceExe)) {
     $SourceExe = Join-Path $SourceDir "TuneshineWindows.exe"
 }
 
+# Auto-rebuild if running in repo with newer source code or missing binary
+$BuildPy = Join-Path $SourceDir "build_exe.py"
+$VenvPy = Join-Path $SourceDir ".venv\Scripts\python.exe"
+if ((Test-Path $BuildPy) -and (Test-Path $VenvPy)) {
+    $needsBuild = -not (Test-Path $SourceExe)
+    if (-not $needsBuild) {
+        $latestSourceTime = (Get-ChildItem -Path $SourceDir -Filter "*.py" | Measure-Object -Property LastWriteTime -Maximum).Maximum
+        $exeTime = (Get-Item $SourceExe).LastWriteTime
+        if ($latestSourceTime -gt $exeTime) {
+            $needsBuild = $true
+        }
+    }
+    if ($needsBuild) {
+        Write-Host "Rebuilding $DisplayName from source..." -ForegroundColor Yellow
+        & $VenvPy $BuildPy
+        $SourceExe = Join-Path $SourceDir "dist\TuneshineWindows.exe"
+    }
+}
+
 if (-not (Test-Path $SourceExe)) {
     Write-Host "Error: TuneshineWindows.exe not found! Please run build_exe.py first." -ForegroundColor Red
     exit 1
@@ -28,9 +47,21 @@ if (-not (Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-# 3. Copy files
+# 3. Copy files with retry in case of slow process cleanup
 $TargetExe = Join-Path $InstallDir "TuneshineWindows.exe"
-Copy-Item -Path $SourceExe -Destination $TargetExe -Force
+$copied = $false
+for ($i = 1; $i -le 5; $i++) {
+    try {
+        Copy-Item -Path $SourceExe -Destination $TargetExe -Force
+        $copied = $true
+        break
+    } catch {
+        Start-Sleep -Milliseconds 500
+    }
+}
+if (-not $copied) {
+    Copy-Item -Path $SourceExe -Destination $TargetExe -Force
+}
 
 $SourceIcon = Join-Path $SourceDir "icon.ico"
 if (Test-Path $SourceIcon) {

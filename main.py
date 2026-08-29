@@ -25,7 +25,11 @@ class TuneshineWindowsApp:
     def __init__(self):
         self.config = Config()
         self.hub_client = HubClient(self.config.hub_url, mode=self.config.mode)
-        self.listener = MediaListener(self.on_media_update)
+        self.listener = MediaListener(
+            on_update=self.on_media_update,
+            config=self.config,
+            on_detected_apps_changed=self.on_detected_apps_changed,
+        )
 
         self.dashboard = WebviewDashboard(
             config=self.config,
@@ -47,12 +51,17 @@ class TuneshineWindowsApp:
     def show_dashboard(self):
         self.dashboard.show()
 
+    def on_detected_apps_changed(self):
+        self.dashboard.update_detected_apps()
+
     def on_config_changed(self):
         self.tray.update_state(
             is_playing=self.hub_client.is_currently_playing,
             is_paused=False,
             track_summary=self.listener.current_track.summary,
         )
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.listener.check_current_media(trigger="config_changed"), self._loop)
 
     def on_toggle_enabled(self, enabled: bool):
         self.config.enabled = enabled

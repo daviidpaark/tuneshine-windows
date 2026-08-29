@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-08-29
+
+### Added
+- **Streamlined Program Filtering (Allow & Block):** Introduced customizable program filtering with three operation modes:
+  - `Off (Allow All)`: All detected media players sync without restriction.
+  - `Block Mode`: Disables synchronization for blocked programs (e.g. `chrome.exe`, `msedge.exe`, Discord, games) while allowing all other media players.
+  - `Allow Mode`: Strict mode. Only permits explicitly approved media players (e.g. `Spotify.exe`, `Apple Music`).
+- **Dynamic Program Discovery:** Automatically detects active media players on Windows in real-time and registers them in the dashboard with clean human-readable names and timestamps.
+- **Dedicated Allow / Block Toggles:** 1-click `[ Allow ]` and `[ Block ]` pills per program with immediate status reflection.
+- **Smart Session Fallback:** When Windows' currently focused session is blocked by a filter rule, Tuneshine automatically inspects background media sessions to keep music syncing uninterrupted.
+- **Real-Time Hero Card Status:** Displays `BLOCKED` (red) status and app details whenever active playback is filtered out.
+- **Automated Installer Rebuild:** Installer automatically detects modified Python source code and recompiles `dist\TuneshineWindows.exe` prior to installation.
+
+---
+
 ## [0.2.0] - 2026-08-29
 
 ### Added

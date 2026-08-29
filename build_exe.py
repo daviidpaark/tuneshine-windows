@@ -26,6 +26,7 @@ def build():
         "--hidden-import", "winrt.windows.media.control",
         "--hidden-import", "winrt.windows.storage.streams",
         "--hidden-import", "winrt.windows.foundation",
+        "--hidden-import", "winrt.windows.foundation.collections",
         "--hidden-import", "winrt.runtime",
         "--hidden-import", "PIL",
         "--hidden-import", "httpx",
