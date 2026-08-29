@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.pyo
+
+# PyInstaller & Build artifacts
+build/
+dist/
+*.spec
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Local User Configuration & Logs
+config.json
+*.log
+*.tmp
+*.bak
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Windows & OS Artifacts
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# IDE / Editor Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
