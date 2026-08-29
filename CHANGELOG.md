@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-08-29
+
+### Fixed
+- **Multi-Tier Media Session Prioritization:** Fixed session resolution bug where blocked sessions (e.g. Plezy) could remain displayed when an allowed player (e.g. Spotify) was active or paused. Implemented numerical scoring to prioritize allowed active music over background video or closed sessions.
+- **Asynchronous Artwork Arrival Handling:** Fixed race condition where Spotify's delayed album art update (buffered 100ms after track text) was skipped due to duplicate state key deduplication.
+- **Paused Track Metadata & Art:** Extracted full track title, artist, album, and artwork for paused sessions so the dashboard and tray accurately display paused songs rather than falling back to empty idle.
+- **WinRT COM Disconnection Auto-Recovery:** Added automatic recovery from COM/RPC disconnections (`RPC_E_DISCONNECTED` / `0x80010108`) after Windows sleep, hibernate, or lock.
+- **Zombie / Closed Session Filtering:** Explicitly filtered out `STATUS_CLOSED` sessions to prevent dead browser tabs from interfering with active media sessions.
+- **UWP & App Identifier Normalization:** Enhanced token-based matching in `is_app_allowed` to handle UWP package family names (e.g. `SpotifyAB.SpotifyMusic_...`), clean base stems, and standard `.exe` players without false positive token collisions.
+- **Artwork Stream Isolation:** Prevented thumbnail leakage across different tracks or players.
+- **Async Concurrency Lock:** Serialized media evaluations using an `asyncio.Lock()` to prevent out-of-order execution during rapid track skipping.
+- **Friendly App Name in UI:** Displays clean app names (`Spotify`, `Plezy`, `Apple Music`) instead of raw file paths or package IDs in the web dashboard.
+
+---
+
 ## [0.3.0] - 2026-08-29
 
 ### Added

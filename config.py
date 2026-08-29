@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.3.1"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -318,19 +318,44 @@ class Config:
         if mode in ("off", "none", "all"):
             return True
 
-        def _match(rule: str, target_id: str) -> bool:
-            r = rule.strip().lower()
-            t = target_id.strip().lower()
-            if not r or not t:
+        def _normalize_app(name: str) -> set:
+            if not name:
+                return set()
+            s = name.strip().lower()
+            base = Path(s).name.lower()
+            if base.endswith(".exe"):
+                base = base[:-4]
+
+            tokens = {s, base, base.replace(" ", "")}
+            if "!" in base:
+                for p in base.split("!"):
+                    if p and p not in ("exe", "app", "win"):
+                        tokens.add(p)
+                        tokens.add(p.replace(" ", ""))
+            if "_" in base:
+                for p in base.split("_"):
+                    if p and p not in ("exe", "app", "win"):
+                        tokens.add(p)
+                        tokens.add(p.replace(" ", ""))
+            if "." in base:
+                for p in base.split("."):
+                    if p and p not in ("exe", "app", "win"):
+                        tokens.add(p)
+                        tokens.add(p.replace(" ", ""))
+            return {t for t in tokens if t and t not in ("exe", "app", "win")}
+
+        def _match(rule: str, target: str) -> bool:
+            if not rule or not target:
                 return False
-            if r == t:
+            r_set = _normalize_app(rule)
+            t_set = _normalize_app(target)
+            if r_set.intersection(t_set):
                 return True
-            r_base = Path(r).name.lower()
-            t_base = Path(t).name.lower()
-            if r_base == t_base or Path(r_base).stem == Path(t_base).stem:
-                return True
-            if r in t or t in r:
-                return True
+            for r in r_set:
+                if len(r) >= 4:
+                    for t in t_set:
+                        if len(t) >= 4 and (r in t or t in r):
+                            return True
             return False
 
         if mode in ("block", "blacklist"):

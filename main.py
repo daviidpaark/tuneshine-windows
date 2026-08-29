@@ -55,6 +55,7 @@ class TuneshineWindowsApp:
         self.dashboard.update_detected_apps()
 
     def on_config_changed(self):
+        self.listener.invalidate_state()
         self.tray.update_state(
             is_playing=self.hub_client.is_currently_playing,
             is_paused=False,

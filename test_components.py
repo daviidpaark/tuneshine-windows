@@ -329,11 +329,164 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertTrue(apps_changed_called)
             self.assertIn("plezy.exe", cfg.detected_apps)
 
-            # Allowed check
+    def test_uwp_and_app_matching(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "uwp_config.json"
+            cfg = Config(custom_path=tmp_config_path)
+
+            # Block mode test
             cfg.filter_mode = "block"
-            cfg.blocked_apps = ["chrome.exe"]
-            self.assertTrue(listener._is_allowed("plezy.exe"))
-            self.assertFalse(listener._is_allowed("chrome.exe"))
+            cfg.blocked_apps = ["plezy.exe", "Plex.exe"]
+            self.assertFalse(cfg.is_app_allowed("plezy.exe"))
+            self.assertFalse(cfg.is_app_allowed("Plezy"))
+            self.assertFalse(cfg.is_app_allowed("plex.exe"))
+            self.assertTrue(cfg.is_app_allowed("Spotify.exe"))
+            self.assertTrue(cfg.is_app_allowed("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"))
+
+            # Allow mode test with UWP app ID matching exe rule
+            cfg.filter_mode = "allow"
+            cfg.allowed_apps = ["Spotify.exe", "AppleInc.AppleMusicWin_8wekyb3d8bbwe!App"]
+            self.assertTrue(cfg.is_app_allowed("Spotify.exe"))
+            self.assertTrue(cfg.is_app_allowed("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"))
+            self.assertTrue(cfg.is_app_allowed("AppleInc.AppleMusicWin_8wekyb3d8bbwe!App"))
+            self.assertFalse(cfg.is_app_allowed("plezy.exe"))
+            self.assertFalse(cfg.is_app_allowed("chrome.exe"))
+
+    def test_listener_session_priority_and_selection(self):
+        import tempfile
+        from pathlib import Path
+        from media_listener import MediaListener, STATUS_PLAYING
+        import winrt.windows.media.control as wmc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "priority_config.json"
+            cfg = Config(custom_path=tmp_config_path)
+            cfg.filter_mode = "block"
+            cfg.blocked_apps = ["plezy.exe"]
+
+            updates = []
+            async def on_update(track):
+                updates.append(track)
+
+            listener = MediaListener(on_update=on_update, config=cfg)
+            listener._running = True
+
+            # Create mock session factory
+            def make_mock_session(app_id, is_playing, title, artist):
+                mock_s = MagicMock()
+                mock_s.source_app_user_model_id = app_id
+                mock_pb = MagicMock()
+                mock_pb.playback_status = STATUS_PLAYING if is_playing else wmc.GlobalSystemMediaTransportControlsSessionPlaybackStatus.PAUSED
+                mock_s.get_playback_info.return_value = mock_pb
+
+                mock_props = MagicMock()
+                mock_props.title = title
+                mock_props.artist = artist
+                mock_props.album_title = "Test Album"
+                mock_props.thumbnail = None
+                mock_s.try_get_media_properties_async = AsyncMock(return_value=mock_props)
+                return mock_s
+
+            plezy_session = make_mock_session("plezy.exe", is_playing=True, title="Co-Pilot", artist="The Shield")
+            spotify_session = make_mock_session("Spotify.exe", is_playing=True, title="Song A", artist="Artist A")
+
+            # Mock session manager
+            mock_mgr = MagicMock()
+            listener.manager = mock_mgr
+
+            # Scenario 1: Both Plezy (blocked, playing) and Spotify (allowed, playing) active
+            mock_mgr.get_current_session.return_value = plezy_session
+            mock_mgr.get_sessions.return_value = [plezy_session, spotify_session]
+
+            asyncio.run(listener.check_current_media(trigger="test1"))
+            self.assertEqual(len(updates), 1)
+            self.assertEqual(updates[-1].app_id, "Spotify.exe")
+            self.assertTrue(updates[-1].is_playing)
+            self.assertEqual(updates[-1].title, "Song A")
+            self.assertFalse(updates[-1].is_blocked)
+
+            # Scenario 2: Spotify is PAUSED, Plezy is PLAYING (blocked)
+            # Spotify (allowed paused) should take precedence over showing blocked Plezy
+            spotify_paused = make_mock_session("Spotify.exe", is_playing=False, title="Song B", artist="Artist B")
+            mock_mgr.get_sessions.return_value = [plezy_session, spotify_paused]
+            listener.invalidate_state()
+
+            asyncio.run(listener.check_current_media(trigger="test2"))
+            self.assertEqual(updates[-1].app_id, "Spotify.exe")
+            self.assertFalse(updates[-1].is_playing)
+            self.assertEqual(updates[-1].title, "Song B")
+            self.assertFalse(updates[-1].is_blocked)
+
+            # Scenario 3: Only Plezy (blocked, playing) is active
+            mock_mgr.get_current_session.return_value = plezy_session
+            mock_mgr.get_sessions.return_value = [plezy_session]
+            listener.invalidate_state()
+
+            asyncio.run(listener.check_current_media(trigger="test3"))
+            self.assertEqual(updates[-1].app_id, "plezy.exe")
+            self.assertFalse(updates[-1].is_playing)
+            self.assertTrue(updates[-1].is_blocked)
+            # Scenario 5: Closed sessions should be ignored
+            chrome_closed = make_mock_session("chrome.exe", is_playing=False, title="YouTube", artist="")
+            chrome_closed.get_playback_info.return_value.playback_status = wmc.GlobalSystemMediaTransportControlsSessionPlaybackStatus.CLOSED
+            mock_mgr.get_sessions.return_value = [chrome_closed, spotify_paused]
+            listener.invalidate_state()
+
+            asyncio.run(listener.check_current_media(trigger="test5"))
+            self.assertEqual(updates[-1].app_id, "Spotify.exe")
+            self.assertEqual(updates[-1].title, "Song B")
+
+    def test_delayed_artwork_arrival(self):
+        import tempfile
+        from pathlib import Path
+        from media_listener import MediaListener, STATUS_PLAYING
+        import winrt.windows.media.control as wmc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "art_config.json"
+            cfg = Config(custom_path=tmp_config_path)
+
+            updates = []
+            async def on_update(track):
+                updates.append(track)
+
+            listener = MediaListener(on_update=on_update, config=cfg)
+            listener._running = True
+
+            mock_s = MagicMock()
+            mock_s.source_app_user_model_id = "Spotify.exe"
+            mock_pb = MagicMock()
+            mock_pb.playback_status = STATUS_PLAYING
+            mock_s.get_playback_info.return_value = mock_pb
+
+            # Stage 1: Song starts with title and artist, but thumbnail is None
+            mock_props = MagicMock()
+            mock_props.title = "Song With Delayed Art"
+            mock_props.artist = "Artist Name"
+            mock_props.album_title = "Album"
+            mock_props.thumbnail = None
+            mock_s.try_get_media_properties_async = AsyncMock(return_value=mock_props)
+
+            mock_mgr = MagicMock()
+            mock_mgr.get_current_session.return_value = mock_s
+            mock_mgr.get_sessions.return_value = [mock_s]
+            listener.manager = mock_mgr
+
+            asyncio.run(listener.check_current_media(trigger="art_stage1"))
+            self.assertEqual(len(updates), 1)
+            self.assertIsNone(updates[-1].thumbnail_bytes)
+
+            # Stage 2: 100ms later, thumbnail becomes available
+            mock_thumb_ref = MagicMock()
+            mock_props.thumbnail = mock_thumb_ref
+            listener._read_thumbnail = AsyncMock(return_value=b"fake_jpeg_bytes")
+
+            # Even though state_key is identical, it must emit update because art arrived!
+            asyncio.run(listener.check_current_media(trigger="art_stage2"))
+            self.assertEqual(len(updates), 2)
+            self.assertEqual(updates[-1].thumbnail_bytes, b"fake_jpeg_bytes")
 
 
 if __name__ == "__main__":

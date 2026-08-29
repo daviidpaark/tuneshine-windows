@@ -635,7 +635,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- 5. Footer -->
   <div class="footer">
     <div class="footer-left">
-      <span class="version-label" id="verLabel">v0.3.0</span>
+      <span class="version-label" id="verLabel">v0.3.1</span>
       <a class="config-link" id="configPathLabel" onclick="openConfigFolder()" title="Click to open config folder">Config: config.json</a>
     </div>
     <span id="toastMsg" class="toast">Saved ✓</span>
@@ -890,10 +890,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const artist = document.getElementById('trackArtist');
       const art = document.getElementById('coverArt');
 
+      const appLabel = track.app_name || (track.app_id ? track.app_id.replace('.exe', '') : '');
+
       if (track.is_playing) {
         badge.className = 'badge badge-syncing';
         badgeText.innerText = 'SYNCING';
-        sourceApp.innerText = track.app_id ? 'via ' + track.app_id.replace('.exe', '') : '';
+        sourceApp.innerText = appLabel ? 'via ' + appLabel : '';
         title.innerText = track.title || 'Unknown Title';
         artist.innerText = track.artist + (track.album ? ' • ' + track.album : '');
         if (track.art_b64) {
@@ -904,7 +906,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       } else if (track.is_blocked) {
         badge.className = 'badge badge-blocked';
         badgeText.innerText = 'BLOCKED';
-        sourceApp.innerText = track.app_id ? 'via ' + track.app_id.replace('.exe', '') + ' (Blocked)' : '';
+        sourceApp.innerText = appLabel ? 'via ' + appLabel + ' (Blocked)' : 'Blocked';
         title.innerText = track.title || 'Playback Blocked';
         artist.innerText = (track.artist ? track.artist + ' • ' : '') + 'Blocked by filter rules';
         art.src = DEFAULT_ART;
@@ -912,10 +914,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const isPaused = Boolean(track.title);
         badge.className = isPaused ? 'badge badge-paused' : 'badge badge-idle';
         badgeText.innerText = isPaused ? 'PAUSED' : 'IDLE';
-        sourceApp.innerText = '';
+        sourceApp.innerText = (isPaused && appLabel) ? 'via ' + appLabel : '';
         title.innerText = isPaused ? track.title : 'No Active Playback';
-        artist.innerText = isPaused ? track.artist : 'Waiting for media session...';
-        if (!isPaused) {
+        artist.innerText = isPaused ? (track.artist + (track.album ? ' • ' + track.album : '')) : 'Waiting for media session...';
+        if (isPaused && track.art_b64) {
+          art.src = 'data:image/png;base64,' + track.art_b64;
+        } else if (!isPaused) {
           art.src = DEFAULT_ART;
         }
       }
@@ -1136,6 +1140,7 @@ class WebviewDashboard:
             "artist": track.artist,
             "album": track.album,
             "app_id": track.app_id,
+            "app_name": getattr(track, "app_name", "") or track.app_id,
             "art_b64": art_b64,
         }
         self.api.latest_track_dict = track_dict
