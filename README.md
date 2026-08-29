@@ -102,15 +102,34 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 ## Configuration
 
-Right-click the square **Tuneshine** icon in your Windows System Tray (near the clock):
+### System Tray & Dashboard
 
-- **Configure Target Host...** — Set the IP/URL of your Hub or physical Tuneshine (e.g. `http://unraid:8585`).
+Double-click the square **Tuneshine** icon in your Windows System Tray (or right-click and select **Open Dashboard**) to manage all settings:
+
+- **Target Host / URL** — Set the address of your Hub (e.g. `http://localhost:8585` or `http://192.168.1.50:8585`) or physical Tuneshine.
 - **Operation Mode** — Switch between `Tuneshine Hub (Offload)` and `Direct to Device (Standalone)`.
-- **Sync Enabled** — Pause or resume syncing.
-- **Start Minimized to Tray** — Launch quietly in the system tray without opening the dashboard window.
-- **Launch on Windows Startup** — Toggle automatic background start on Windows login.
+- **Program Filtering** — Select `Off (Allow All)`, `Block Mode` (blacklist), or `Allow Mode` (whitelist) to control which apps are allowed to push artwork.
+- **Start Minimized to Tray** — Launch quietly in the system tray without popping up the dashboard window.
+- **Launch on Windows Startup** — Enable or disable automatic background start on Windows login.
+- **Clear Delay & Service Name** — Customize debounce duration and the service label displayed on hardware.
 
-Settings are saved automatically to `config.json` (in `%APPDATA%\tuneshine-windows\config.json` or local folder):
+### Right-Click Tray Menu
+
+- **Open Dashboard** — Opens the GUI settings dashboard (default action on double-click).
+- **Status / Track Info** — Quick glance at active connection state and current song title.
+- **Sync Enabled** — One-click toggle to pause or resume screen updates.
+- **Exit** — Completely quits the background listener.
+
+### Command Line Options
+
+| Flag | Description |
+| :--- | :--- |
+| `--dashboard`, `--show` | Force the dashboard window to open immediately on startup |
+| `--tray`, `--minimized`, `--hidden` | Force starting minimized to the system tray |
+
+### Configuration File (`config.json`)
+
+Settings are saved automatically to `config.json` (located in `%APPDATA%\tuneshine-windows\config.json` or local application directory):
 
 ```json
 {
@@ -120,7 +139,11 @@ Settings are saved automatically to `config.json` (in `%APPDATA%\tuneshine-windo
   "start_in_tray": true,
   "clear_delay": 2.0,
   "service_name": "Spotify",
-  "autostart": false
+  "autostart": false,
+  "filter_mode": "off",
+  "blacklist": [],
+  "whitelist": [],
+  "detected_apps": {}
 }
 ```
 
