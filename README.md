@@ -101,17 +101,19 @@ Right-click the square **Tuneshine** icon in your Windows System Tray (near the 
 - **Configure Target Host...** — Set the IP/URL of your Hub or physical Tuneshine (e.g. `http://unraid:8585`).
 - **Operation Mode** — Switch between `Tuneshine Hub (Offload)` and `Direct to Device (Standalone)`.
 - **Sync Enabled** — Pause or resume syncing.
+- **Start Minimized to Tray** — Launch quietly in the system tray without opening the dashboard window.
 - **Launch on Windows Startup** — Toggle automatic background start on Windows login.
 
-Settings are saved in `%APPDATA%\tuneshine-windows\config.json`:
+Settings are saved automatically to `config.json` (in `%APPDATA%\tuneshine-windows\config.json` or local folder):
 
 ```json
 {
   "hub_url": "http://localhost:8585",
   "mode": "hub",
   "enabled": true,
+  "start_in_tray": true,
   "clear_delay": 2.0,
-  "service_name": "Windows Media",
+  "service_name": "Spotify",
   "autostart": false
 }
 ```

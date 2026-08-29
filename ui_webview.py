@@ -7,10 +7,9 @@ import threading
 from typing import Optional, Callable
 import webview
 
-from config import Config
+from config import Config, APP_VERSION
 from hub_client import HubClient
 from media_listener import TrackInfo
-import updater
 
 logger = logging.getLogger("tuneshine-windows.ui")
 
@@ -323,13 +322,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       margin-top: auto;
       padding-top: 4px;
     }
-    .version-link {
+    .footer-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .version-label {
       font-size: 11px;
       color: #71717a;
+    }
+    .config-link {
+      font-size: 10px;
+      color: #52525b;
       text-decoration: none;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 170px;
     }
-    .version-link:hover {
+    .config-link:hover {
       color: #a1a1aa;
       text-decoration: underline;
     }
@@ -367,7 +379,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="form-group">
       <label class="form-label">Target Hub Address</label>
       <div class="input-row">
-        <input type="text" id="hubUrl" placeholder="http://unraid:8585">
+        <input type="text" id="hubUrl" placeholder="http://unraid:8585" onchange="autoSave()" onkeydown="if(event.key==='Enter'){manualSave();}">
         <button id="btnTest" class="btn-secondary" onclick="testConnection()">Ping</button>
       </div>
     </div>
@@ -392,6 +404,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div class="setting-row">
+      <span class="setting-label">Start Minimized to Tray</span>
+      <label class="switch">
+        <input type="checkbox" id="chkStartInTray" onchange="autoSave()">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="setting-row">
       <span class="setting-label">Launch with Windows</span>
       <label class="switch">
         <input type="checkbox" id="chkAutostart" onchange="autoSave()">
@@ -411,7 +431,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <!-- 4. Footer -->
   <div class="footer">
-    <a class="version-link" id="verLabel" onclick="checkUpdates()">v1.0.0 • Check updates</a>
+    <div class="footer-left">
+      <span class="version-label" id="verLabel">v0.2.0</span>
+      <a class="config-link" id="configPathLabel" onclick="openConfigFolder()" title="Click to open config folder">Config: config.json</a>
+    </div>
     <span id="toastMsg" class="toast">Saved ✓</span>
     <button class="btn-primary" onclick="manualSave()">Save Settings</button>
   </div>
@@ -450,6 +473,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         hub_url: document.getElementById('hubUrl').value.trim(),
         mode: currentMode,
         enabled: document.getElementById('chkSync').checked,
+        start_in_tray: document.getElementById('chkStartInTray').checked,
         autostart: document.getElementById('chkAutostart').checked,
         clear_delay: delayVal
       };
@@ -457,15 +481,29 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     async function autoSave() {
       if (window.pywebview && window.pywebview.api) {
-        await window.pywebview.api.save_settings(getFormData());
-        showToast("Saved ✓");
+        const res = await window.pywebview.api.save_settings(getFormData());
+        if (res && res.success) {
+          showToast("Saved ✓");
+        } else {
+          showToast("Save failed", true);
+        }
       }
     }
 
     async function manualSave() {
       if (window.pywebview && window.pywebview.api) {
-        await window.pywebview.api.save_settings(getFormData());
-        showToast("Saved ✓");
+        const res = await window.pywebview.api.save_settings(getFormData());
+        if (res && res.success) {
+          showToast("Saved ✓");
+        } else {
+          showToast("Save failed", true);
+        }
+      }
+    }
+
+    async function openConfigFolder() {
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.open_config_folder();
       }
     }
 
@@ -488,21 +526,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           btn.innerText = 'Ping';
           btn.style.color = '#e4e4e7';
         }, 3000);
-      }
-    }
-
-    async function checkUpdates() {
-      const link = document.getElementById('verLabel');
-      link.innerText = 'Checking...';
-      if (window.pywebview && window.pywebview.api) {
-        const res = await window.pywebview.api.check_updates();
-        if (res.has_update) {
-          link.innerText = 'Update available (v' + res.version + ')';
-          link.style.color = '#22c55e';
-        } else {
-          link.innerText = 'Up to date (v' + res.version + ')';
-          setTimeout(() => { link.innerText = 'v' + res.version + ' • Check updates'; }, 3000);
-        }
       }
     }
 
@@ -545,11 +568,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const init = await window.pywebview.api.get_initial_state();
         document.getElementById('hubUrl').value = init.config.hub_url;
         document.getElementById('chkSync').checked = init.config.enabled;
+        document.getElementById('chkStartInTray').checked = init.config.start_in_tray;
         document.getElementById('chkAutostart').checked = init.config.autostart;
         delayVal = init.config.clear_delay || 2.0;
         document.getElementById('clearDelay').value = delayVal.toFixed(1) + 's';
         setMode(init.config.mode || 'hub');
-        document.getElementById('verLabel').innerText = 'v' + init.version + ' • Check updates';
+        document.getElementById('verLabel').innerText = 'v' + init.version;
+
+        if (init.config_path) {
+          document.getElementById('configPathLabel').innerText = 'Config: ' + (init.config_filename || 'config.json');
+          document.getElementById('configPathLabel').title = init.config_path + ' (Click to open folder)';
+        }
 
         if (init.current_track) {
           window.updateTrackInfo(init.current_track);
@@ -577,25 +606,39 @@ class WebViewApi:
                 "hub_url": self.config.hub_url,
                 "mode": self.config.mode,
                 "enabled": self.config.enabled,
+                "start_in_tray": self.config.start_in_tray,
                 "autostart": self.config.autostart,
                 "clear_delay": self.config.clear_delay,
             },
-            "version": updater.APP_VERSION,
+            "config_path": str(self.config.config_path),
+            "config_filename": self.config.config_path.name,
+            "version": APP_VERSION,
             "current_track": self.latest_track_dict,
         }
 
     def save_settings(self, data: dict):
         if not data:
             return {"success": False}
-        self.config.hub_url = data.get("hub_url", self.config.hub_url).rstrip("/")
-        self.config.mode = data.get("mode", self.config.mode)
-        self.config.enabled = bool(data.get("enabled", self.config.enabled))
-        self.config.autostart = bool(data.get("autostart", self.config.autostart))
-        self.config.data["clear_delay"] = float(data.get("clear_delay", self.config.clear_delay))
+        if "hub_url" in data:
+            self.config.hub_url = data.get("hub_url", self.config.hub_url).rstrip("/")
+        if "mode" in data:
+            self.config.mode = data.get("mode", self.config.mode)
+        if "enabled" in data:
+            self.config.enabled = bool(data.get("enabled", self.config.enabled))
+        if "start_in_tray" in data:
+            self.config.start_in_tray = bool(data.get("start_in_tray", self.config.start_in_tray))
+        if "autostart" in data:
+            self.config.autostart = bool(data.get("autostart", self.config.autostart))
+        if "clear_delay" in data:
+            self.config.clear_delay = float(data.get("clear_delay", self.config.clear_delay))
         self.config.save()
 
         self.hub_client.update_url(self.config.hub_url, mode=self.config.mode)
         self.on_config_changed()
+        return {"success": True, "path": str(self.config.config_path)}
+
+    def open_config_folder(self):
+        self.config.open_config_folder()
         return {"success": True}
 
     def test_connection(self, url: str):
@@ -611,18 +654,6 @@ class WebViewApi:
         finally:
             loop.close()
 
-    def check_updates(self):
-        loop = asyncio.new_event_loop()
-        try:
-            info = loop.run_until_complete(updater.check_for_updates())
-            if info:
-                return {"has_update": True, "version": info["version"], "url": info["html_url"]}
-            return {"has_update": False, "version": updater.APP_VERSION}
-        except Exception as e:
-            return {"has_update": False, "version": updater.APP_VERSION, "error": str(e)}
-        finally:
-            loop.close()
-
 
 class WebviewDashboard:
     def __init__(self, config: Config, hub_client: HubClient, on_config_changed: Callable[[], None]):
@@ -632,14 +663,15 @@ class WebviewDashboard:
         self.api = WebViewApi(config, hub_client, on_config_changed)
         self.window: Optional[webview.Window] = None
 
-    def create_window(self):
+    def create_window(self, hidden: bool = False):
         self.window = webview.create_window(
             title="Tuneshine Windows",
             html=HTML_TEMPLATE,
             js_api=self.api,
             width=390,
-            height=510,
+            height=545,
             resizable=False,
+            hidden=hidden,
             background_color="#0d0d10",
         )
         self.window.events.closing += self._on_closing

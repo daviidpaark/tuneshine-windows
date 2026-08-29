@@ -13,7 +13,6 @@ from hub_client import HubClient
 from media_listener import MediaListener, TrackInfo
 from tray import TrayApp
 from ui_webview import WebviewDashboard
-import updater
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,9 +71,7 @@ class TuneshineWindowsApp:
             if self._clear_timer_task and not self._clear_timer_task.done():
                 self._clear_timer_task.cancel()
 
-            service_label = self.config.service_name
-            if track.app_id:
-                service_label = track.app_id.replace(".exe", "").capitalize()
+            service_label = self.config.service_name or "Spotify"
 
             success = await self.hub_client.send_playing(
                 image_bytes=track.thumbnail_bytes,
@@ -117,20 +114,8 @@ class TuneshineWindowsApp:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
 
-        async def _update_checker_loop():
-            await asyncio.sleep(3.0)
-            while self._running:
-                try:
-                    update_info = await updater.check_for_updates()
-                    if update_info:
-                        self.tray.set_available_update(update_info)
-                except Exception as e:
-                    logger.debug(f"Update check error: {e}")
-                await asyncio.sleep(12 * 3600)
-
         async def _main():
             await self.listener.start()
-            asyncio.create_task(_update_checker_loop())
             while self._running:
                 await asyncio.sleep(1.0)
             await self.hub_client.close()
@@ -142,9 +127,20 @@ class TuneshineWindowsApp:
         finally:
             self._loop.close()
 
-    def start(self):
+    def start(self, start_hidden: Optional[bool] = None):
         logger.info("Starting Tuneshine Windows Desktop Companion...")
         self._running = True
+
+        # Determine if window should start hidden (minimized to tray)
+        if start_hidden is None:
+            if any(arg in sys.argv for arg in ("--show", "--dashboard")):
+                start_hidden = False
+            elif any(arg in sys.argv for arg in ("--tray", "--minimized", "--hidden")):
+                start_hidden = True
+            else:
+                start_hidden = self.config.start_in_tray
+
+        logger.info(f"Start in tray mode: {start_hidden}")
 
         # Start WinRT & networking background loop
         self._async_thread = threading.Thread(target=self._run_async_worker, daemon=True)
@@ -155,7 +151,7 @@ class TuneshineWindowsApp:
         self._tray_thread.start()
 
         # Create WebView window
-        self.dashboard.create_window()
+        self.dashboard.create_window(hidden=start_hidden)
 
         # Run WebView GUI loop on main thread
         webview.start(debug=False)

@@ -9,23 +9,34 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
+APP_VERSION = "0.2.0"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
     "enabled": True,
+    "start_in_tray": True,
     "clear_delay": 2.0,
-    "service_name": "Windows Media",
+    "service_name": "Spotify",
     "autostart": False,
 }
 
 
 def get_config_dir() -> Path:
     """Returns the configuration directory (%APPDATA%/tuneshine-windows or local)."""
+    # Check if a local config.json exists next to script/exe or in cwd (portable mode)
+    local_dir = Path(__file__).parent.resolve()
+    if (local_dir / "config.json").exists():
+        return local_dir
+
+    cwd_dir = Path.cwd().resolve()
+    if (cwd_dir / "config.json").exists():
+        return cwd_dir
+
     appdata = os.environ.get("APPDATA")
     if appdata:
         config_dir = Path(appdata) / "tuneshine-windows"
     else:
-        config_dir = Path(__file__).parent
+        config_dir = local_dir
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
 
@@ -35,8 +46,8 @@ def get_config_path() -> Path:
 
 
 class Config:
-    def __init__(self):
-        self.config_path = get_config_path()
+    def __init__(self, custom_path: Path = None):
+        self.config_path = custom_path or get_config_path()
         self.data: Dict[str, Any] = DEFAULT_CONFIG.copy()
         self.load()
 
@@ -54,6 +65,7 @@ class Config:
 
     def save(self):
         try:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=2)
             logger.info(f"Saved configuration to {self.config_path}")
@@ -72,7 +84,7 @@ class Config:
 
     @property
     def mode(self) -> str:
-        return str(self.data.get("mode", "hub")).lower()
+        return str(self.data.get("mode", DEFAULT_CONFIG["mode"])).lower()
 
     @mode.setter
     def mode(self, value: str):
@@ -81,28 +93,47 @@ class Config:
 
     @property
     def enabled(self) -> bool:
-        return bool(self.data.get("enabled", True))
+        return bool(self.data.get("enabled", DEFAULT_CONFIG["enabled"]))
 
     @enabled.setter
     def enabled(self, value: bool):
-        self.data["enabled"] = value
+        self.data["enabled"] = bool(value)
+        self.save()
+
+    @property
+    def start_in_tray(self) -> bool:
+        return bool(self.data.get("start_in_tray", DEFAULT_CONFIG["start_in_tray"]))
+
+    @start_in_tray.setter
+    def start_in_tray(self, value: bool):
+        self.data["start_in_tray"] = bool(value)
         self.save()
 
     @property
     def clear_delay(self) -> float:
-        return float(self.data.get("clear_delay", 2.0))
+        return float(self.data.get("clear_delay", DEFAULT_CONFIG["clear_delay"]))
+
+    @clear_delay.setter
+    def clear_delay(self, value: float):
+        self.data["clear_delay"] = float(value)
+        self.save()
 
     @property
     def service_name(self) -> str:
-        return str(self.data.get("service_name", "Windows Media"))
+        return str(self.data.get("service_name", DEFAULT_CONFIG["service_name"]))
+
+    @service_name.setter
+    def service_name(self, value: str):
+        self.data["service_name"] = str(value)
+        self.save()
 
     @property
     def autostart(self) -> bool:
-        return bool(self.data.get("autostart", False))
+        return bool(self.data.get("autostart", DEFAULT_CONFIG["autostart"]))
 
     @autostart.setter
     def autostart(self, value: bool):
-        self.data["autostart"] = value
+        self.data["autostart"] = bool(value)
         self.save()
         self.sync_autostart_registry(value)
 
@@ -112,15 +143,17 @@ class Config:
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
                 if enable:
-                    # Point to pythonw.exe or the current script
-                    python_exe = sys.executable
-                    pythonw_exe = Path(python_exe).parent / "pythonw.exe"
-                    main_script = Path(__file__).parent / "main.py"
-                    
-                    if pythonw_exe.exists():
-                        cmd = f'"{pythonw_exe}" "{main_script}"'
+                    if getattr(sys, "frozen", False):
+                        cmd = f'"{sys.executable}"'
                     else:
-                        cmd = f'"{python_exe}" "{main_script}"'
+                        python_exe = sys.executable
+                        pythonw_exe = Path(python_exe).parent / "pythonw.exe"
+                        main_script = (Path(__file__).parent / "main.py").resolve()
+                        
+                        if pythonw_exe.exists():
+                            cmd = f'"{pythonw_exe}" "{main_script}"'
+                        else:
+                            cmd = f'"{python_exe}" "{main_script}"'
 
                     winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
                     logger.info(f"Registered Windows autostart: {cmd}")
@@ -132,3 +165,16 @@ class Config:
                         pass
         except Exception as e:
             logger.error(f"Failed to update autostart registry: {e}")
+
+    def open_config_folder(self):
+        """Opens the folder containing config.json in Windows Explorer."""
+        folder = str(self.config_path.parent)
+        try:
+            if sys.platform == "win32":
+                os.startfile(folder)
+            else:
+                import subprocess
+                subprocess.Popen(["explorer", folder])
+        except Exception as e:
+            logger.error(f"Failed to open config folder: {e}")
+

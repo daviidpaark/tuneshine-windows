@@ -11,19 +11,88 @@ from generate_icon import generate_square_icon
 
 class TestTuneshineWindows(unittest.TestCase):
     def test_config_defaults_and_properties(self):
-        config = Config()
-        self.assertTrue(config.hub_url.startswith("http"))
-        self.assertTrue(config.enabled)
-        self.assertIn(config.mode, ["hub", "direct"])
-        self.assertIsInstance(config.clear_delay, float)
-        self.assertIsInstance(config.service_name, str)
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "config_props.json"
+            config = Config(custom_path=tmp_config_path)
+            self.assertTrue(config.hub_url.startswith("http"))
+            self.assertTrue(config.enabled)
+            self.assertTrue(config.start_in_tray)
+            self.assertIn(config.mode, ["hub", "direct"])
+            self.assertIsInstance(config.clear_delay, float)
+            self.assertEqual(config.service_name, "Spotify")
 
-        # Test hub_url setter stripping trailing slash
-        config.hub_url = "http://192.168.1.50:8585/"
-        self.assertEqual(config.hub_url, "http://192.168.1.50:8585")
+            # Test hub_url setter stripping trailing slash
+            config.hub_url = "http://192.168.1.50:8585/"
+            self.assertEqual(config.hub_url, "http://192.168.1.50:8585")
 
-        config.mode = "direct"
-        self.assertEqual(config.mode, "direct")
+            config.mode = "direct"
+            self.assertEqual(config.mode, "direct")
+
+            config.start_in_tray = False
+            self.assertFalse(config.start_in_tray)
+            config.start_in_tray = True
+            self.assertTrue(config.start_in_tray)
+
+            config.clear_delay = 3.5
+            self.assertEqual(config.clear_delay, 3.5)
+
+            config.service_name = "Spotify"
+            self.assertEqual(config.service_name, "Spotify")
+
+    def test_config_file_persistence(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "test_config.json"
+            cfg1 = Config(custom_path=tmp_config_path)
+            cfg1.hub_url = "http://10.0.0.99:9000"
+            cfg1.mode = "direct"
+            cfg1.enabled = False
+            cfg1.start_in_tray = False
+            cfg1.clear_delay = 4.0
+            cfg1.service_name = "TestPlayer"
+
+            self.assertTrue(tmp_config_path.exists())
+
+            # Load new instance from same file
+            cfg2 = Config(custom_path=tmp_config_path)
+            self.assertEqual(cfg2.hub_url, "http://10.0.0.99:9000")
+            self.assertEqual(cfg2.mode, "direct")
+            self.assertFalse(cfg2.enabled)
+            self.assertFalse(cfg2.start_in_tray)
+            self.assertEqual(cfg2.clear_delay, 4.0)
+            self.assertEqual(cfg2.service_name, "TestPlayer")
+
+    def test_webview_api_save_settings(self):
+        import tempfile
+        from pathlib import Path
+        from ui_webview import WebViewApi
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "webview_config.json"
+            cfg = Config(custom_path=tmp_config_path)
+            client = HubClient(cfg.hub_url, mode=cfg.mode)
+            callback_called = False
+
+            def on_changed():
+                nonlocal callback_called
+                callback_called = True
+
+            api = WebViewApi(cfg, client, on_changed)
+            res = api.save_settings({
+                "hub_url": "http://192.168.1.200:8585/",
+                "mode": "hub",
+                "enabled": True,
+                "start_in_tray": True,
+                "autostart": False,
+                "clear_delay": 1.5,
+            })
+            self.assertTrue(res.get("success"))
+            self.assertTrue(callback_called)
+            self.assertEqual(cfg.hub_url, "http://192.168.1.200:8585")
+            self.assertEqual(cfg.clear_delay, 1.5)
+            self.assertTrue(cfg.start_in_tray)
 
     def test_direct_mode_webp_conversion(self):
         from hub_client import convert_to_tuneshine_webp
@@ -96,15 +165,6 @@ class TestTuneshineWindows(unittest.TestCase):
             await client.close()
 
         asyncio.run(run_test())
-
-    def test_updater_version_parsing(self):
-        import updater
-        self.assertEqual(updater.parse_version("v1.0.0"), (1, 0, 0))
-        self.assertEqual(updater.parse_version("1.2.3"), (1, 2, 3))
-        self.assertEqual(updater.parse_version("v2.1"), (2, 1, 0))
-        self.assertTrue(updater.parse_version("v1.1.0") > updater.parse_version("v1.0.9"))
-        self.assertTrue(updater.parse_version("v2.0.0") > updater.parse_version("v1.99.99"))
-        self.assertFalse(updater.parse_version("v1.0.0") > updater.parse_version("v1.0.0"))
 
 
 if __name__ == "__main__":

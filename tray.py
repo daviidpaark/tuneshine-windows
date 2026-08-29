@@ -7,7 +7,6 @@ from pystray import MenuItem as item
 
 from config import Config
 from generate_icon import generate_square_icon
-import updater
 
 logger = logging.getLogger("tuneshine-windows.tray")
 
@@ -31,7 +30,6 @@ class TrayApp:
 
         self.current_status_text = "Idle"
         self.current_track_text = "No track playing"
-        self.available_update: Optional[dict] = None
 
         self.icon = pystray.Icon(
             name="TuneshineWindows",
@@ -43,21 +41,8 @@ class TrayApp:
     def _build_menu(self) -> pystray.Menu:
         mode_label = "Hub" if self.config.mode == "hub" else "Direct"
 
-        items = []
-
-        # Top banner if update is available
-        if self.available_update:
-            ver = self.available_update.get("version", "")
-            items.append(
-                item(
-                    f"Update Available (v{ver})...",
-                    lambda: updater.open_release_page(self.available_update.get("html_url")),
-                )
-            )
-            items.append(pystray.Menu.SEPARATOR)
-
-        items.extend([
-            item("Open Dashboard", lambda: self.on_open_dashboard(), default=True),
+        items = [
+            item("Open Dashboard", lambda *args: self.on_open_dashboard(), default=True),
             item(lambda text: f"Status: {self.current_status_text} ({mode_label})", lambda: None, enabled=False),
             item(lambda text: f"Track: {self.current_track_text[:35]}", lambda: None, enabled=False),
             pystray.Menu.SEPARATOR,
@@ -66,20 +51,15 @@ class TrayApp:
                 lambda icon, it: self._toggle_sync(not it.checked),
                 checked=lambda it: self.config.enabled,
             ),
-            item("Check for Updates...", lambda: self.on_open_dashboard()),
             pystray.Menu.SEPARATOR,
             item("Exit", self._exit),
-        ])
+        ]
 
         return pystray.Menu(*items)
 
     def _toggle_sync(self, enabled: bool):
         self.config.enabled = enabled
         self.on_toggle_enabled(enabled)
-        self.icon.menu = self._build_menu()
-
-    def set_available_update(self, update_info: Optional[dict]):
-        self.available_update = update_info
         self.icon.menu = self._build_menu()
 
     def update_state(

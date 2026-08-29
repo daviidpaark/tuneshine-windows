@@ -53,7 +53,7 @@ class HubClient:
         title: str,
         artist: str,
         album: str,
-        service_name: str = "Windows Media",
+        service_name: str = "Spotify",
         item_id: Optional[str] = None,
     ) -> bool:
         """Pushes playing track art and metadata to Tuneshine Hub or physical device."""
