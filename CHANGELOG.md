@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.3] - 2026-08-30
+
+### Added
+- **Periodic Heartbeat Keep-Alives:** Added a 30-second background keep-alive loop during active playback in Hub mode to continuously refresh the Hub's watchdog timer.
+- **Graceful Windows OS Shutdown / Logoff Hook:** Registered a Win32 console control handler (`SetConsoleCtrlHandler`) via `ctypes` to catch `CTRL_SHUTDOWN_EVENT`, `CTRL_LOGOFF_EVENT`, and `CTRL_CLOSE_EVENT`, immediately dispatching a clean stop signal (`DELETE /image`) before the OS terminates the process.
+- **Synchronous Exit Stopping:** Added `send_stopped_sync()` and updated tray exit/atexit cleanup to guarantee the display is cleared instantly when closing the companion app or shutting down Windows.
+
+---
+
 ## [0.3.2] - 2026-08-29
 
 ### Fixed

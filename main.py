@@ -1,4 +1,7 @@
 import asyncio
+import atexit
+import ctypes
+from ctypes import wintypes
 import logging
 import os
 import sys
@@ -19,6 +22,14 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("tuneshine-windows")
+
+# Windows Console Control Handler types & constants
+PHANDLER_ROUTINE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+CTRL_C_EVENT = 0
+CTRL_BREAK_EVENT = 1
+CTRL_CLOSE_EVENT = 2
+CTRL_LOGOFF_EVENT = 5
+CTRL_SHUTDOWN_EVENT = 6
 
 
 class TuneshineWindowsApp:
@@ -47,6 +58,30 @@ class TuneshineWindowsApp:
         self._running = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._clear_timer_task: Optional[asyncio.Task] = None
+        self._ctrl_handler_ref = None
+
+        self._register_win32_shutdown_handler()
+        atexit.register(self._on_exit_cleanup)
+
+    def _register_win32_shutdown_handler(self):
+        def _console_ctrl_handler(ctrl_type):
+            if ctrl_type in (CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT, CTRL_C_EVENT, CTRL_BREAK_EVENT):
+                logger.info(f"Windows system event ({ctrl_type}) detected; performing emergency cleanup")
+                self._on_exit_cleanup()
+                return True
+            return False
+
+        try:
+            self._ctrl_handler_ref = PHANDLER_ROUTINE(_console_ctrl_handler)
+            ctypes.windll.kernel32.SetConsoleCtrlHandler(self._ctrl_handler_ref, True)
+        except Exception as e:
+            logger.debug(f"Could not register Win32 console control handler: {e}")
+
+    def _on_exit_cleanup(self):
+        try:
+            self.hub_client.send_stopped_sync()
+        except Exception as e:
+            logger.debug(f"Error during exit cleanup: {e}")
 
     def show_dashboard(self):
         self.dashboard.show()
@@ -124,10 +159,23 @@ class TuneshineWindowsApp:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
 
+        async def _heartbeat_worker():
+            while self._running:
+                await asyncio.sleep(30.0)
+                if (
+                    self._running
+                    and self.config.enabled
+                    and self.config.mode == "hub"
+                    and self.hub_client.is_currently_playing
+                ):
+                    await self.hub_client.send_heartbeat()
+
         async def _main():
             await self.listener.start()
+            heartbeat_task = asyncio.create_task(_heartbeat_worker())
             while self._running:
                 await asyncio.sleep(1.0)
+            heartbeat_task.cancel()
             await self.hub_client.close()
 
         try:
@@ -170,6 +218,7 @@ class TuneshineWindowsApp:
         logger.info("Stopping Tuneshine Windows Desktop Companion...")
         self._running = False
         self.listener.stop()
+        self._on_exit_cleanup()
         if self.dashboard.window:
             self.dashboard.window.destroy()
         os._exit(0)

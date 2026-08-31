@@ -635,7 +635,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <!-- 5. Footer -->
   <div class="footer">
     <div class="footer-left">
-      <span class="version-label" id="verLabel">v0.3.2</span>
+      <span class="version-label" id="verLabel">v0.3.3</span>
       <a class="config-link" id="configPathLabel" onclick="openConfigFolder()" title="Click to open config folder">Config: config.json</a>
     </div>
     <span id="toastMsg" class="toast">Saved ✓</span>

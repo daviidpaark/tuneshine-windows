@@ -66,6 +66,7 @@ class HubClient:
             "albumName": album or title or "Unknown Album",
             "serviceName": service_name,
             "itemId": item_id or f"{artist}-{title}",
+            "heartbeat": bool(self.mode == "hub"),
         }
 
         payload_hash = self._compute_hash(image_bytes, metadata)
@@ -128,6 +129,44 @@ class HubClient:
         except httpx.RequestError as e:
             self.last_error = f"Connection error: {e}"
             logger.warning(f"Failed to send DELETE to Hub ({self.hub_url}): {e}")
+            return False
+
+    async def send_heartbeat(self) -> bool:
+        """Sends a lightweight heartbeat ping to the Hub to refresh the watchdog timer."""
+        if self.mode != "hub" or not self.is_currently_playing:
+            return True
+
+        try:
+            resp = await self.client.post(f"{self.hub_url}/heartbeat", timeout=5.0)
+            if resp.status_code == 200:
+                logger.debug("Successfully sent heartbeat to Hub")
+                return True
+            else:
+                logger.warning(f"Hub responded to heartbeat with {resp.status_code}: {resp.text}")
+                return False
+        except httpx.RequestError as e:
+            logger.debug(f"Failed to send heartbeat to Hub ({self.hub_url}): {e}")
+            return False
+
+    def send_stopped_sync(self) -> bool:
+        """Synchronously notifies Tuneshine Hub/device that playback has stopped (used on shutdown/exit)."""
+        if not self.is_currently_playing:
+            return True
+
+        try:
+            with httpx.Client(timeout=2.0) as client:
+                resp = client.delete(f"{self.hub_url}/image")
+                if 200 <= resp.status_code < 300:
+                    self.is_currently_playing = False
+                    self.last_sent_hash = None
+                    self.last_error = None
+                    logger.info("Successfully sent synchronous STOP on exit")
+                    return True
+                else:
+                    logger.warning(f"Target responded to sync DELETE with {resp.status_code}")
+                    return False
+        except Exception as e:
+            logger.debug(f"Failed to send synchronous DELETE ({self.hub_url}): {e}")
             return False
 
     async def check_health(self) -> Dict[str, Any]:

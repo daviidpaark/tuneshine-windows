@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.3.3"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"

@@ -155,6 +155,15 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertTrue(res2)
             self.assertEqual(client.client.post.call_count, 1)
 
+            # Test send_heartbeat while playing in hub mode
+            client.client.post = AsyncMock(return_value=mock_response)
+            res_hb = await client.send_heartbeat()
+            self.assertTrue(res_hb)
+            self.assertEqual(client.client.post.call_count, 1)
+            # Verify URL called was /heartbeat
+            called_url = client.client.post.call_args[0][0]
+            self.assertTrue(called_url.endswith("/heartbeat"))
+
             # Send stopped
             client.client.delete = AsyncMock(return_value=mock_response)
             res_stop = await client.send_stopped()
@@ -162,9 +171,34 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertEqual(client.client.delete.call_count, 1)
             self.assertFalse(client.is_currently_playing)
 
+            # send_heartbeat while stopped should return True without network call
+            client.client.post = AsyncMock()
+            res_hb_idle = await client.send_heartbeat()
+            self.assertTrue(res_hb_idle)
+            client.client.post.assert_not_called()
+
             await client.close()
 
         asyncio.run(run_test())
+
+    def test_send_stopped_sync(self):
+        client = HubClient("http://192.168.1.100:8585", mode="hub")
+        client.is_currently_playing = True
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+
+        with patch("httpx.Client.delete", return_value=mock_resp) as mock_delete:
+            res = client.send_stopped_sync()
+            self.assertTrue(res)
+            self.assertFalse(client.is_currently_playing)
+            mock_delete.assert_called_once_with("http://192.168.1.100:8585/image")
+
+        # When already stopped, returns True without HTTP call
+        with patch("httpx.Client.delete") as mock_delete:
+            res = client.send_stopped_sync()
+            self.assertTrue(res)
+            mock_delete.assert_not_called()
 
     def test_friendly_app_names(self):
         from config import get_friendly_app_name
