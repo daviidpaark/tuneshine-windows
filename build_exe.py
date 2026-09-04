@@ -33,6 +33,7 @@ def build():
         "--hidden-import", "pythonnet",
         "--hidden-import", "clr_loader",
         "--collect-all", "webview",
+        "--add-data", f"{root / 'dashboard.html'};.",
         "--clean",
         "--noconfirm",
         str(main_py),

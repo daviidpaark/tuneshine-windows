@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.4] - 2026-09-04
+
+### Added
+- **Permanent Program Removal & Ignore List:** Clicking `✕` on any detected media app permanently removes it from detected programs and adds it to `ignored_apps`. Ignored apps will never be auto-detected or registered during background polling scans.
+- **Hidden / Ignored Programs Management:** Added an expandable "Hidden (N)" tray in the dashboard with `+ Restore` buttons to un-ignore applications. Typing an app into `+ Add` also automatically restores it.
+- **Dormant Session Filtering:** Background session scans now ignore dormant/idle background processes (e.g., VoIP clients, games, launchers) and only register sessions with active playing or paused media.
+- **High-Contrast Dark Theme:** Upgraded the UI palette with deep charcoal backgrounds (`#0c0d12` / `#151821`), crisp white text (`#ffffff`), emerald green for Allow/Syncing (`#22c55e`), coral red for Block/Errors (`#ef4444`), and amber for Paused.
+- **Dedicated Dashboard Template:** Extracted webview HTML/CSS/JS template from `ui_webview.py` into standalone `dashboard.html`.
+- **Exact Working Dependency Lock:** Added `requirements-lock.txt` for reproducible packaging.
+
+### Changed
+- **Default Window Height:** Increased window height from 720px to 820px to comfortably display all controls and settings without vertical scrollbars.
+
+### Fixed
+- **Config Path Resolution:** Ensured `get_config_path()` resolves properly when `Config()` is instantiated with default arguments.
+
+---
+
 ## [0.3.3] - 2026-08-30
 
 ### Added

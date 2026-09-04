@@ -41,6 +41,13 @@ class TestTuneshineWindows(unittest.TestCase):
             config.service_name = "Spotify"
             self.assertEqual(config.service_name, "Spotify")
 
+    def test_default_config_path(self):
+        from config import get_config_dir, get_config_path
+        cdir = get_config_dir()
+        cpath = get_config_path()
+        self.assertEqual(cpath, cdir / "config.json")
+        self.assertTrue(str(cpath).endswith("config.json"))
+
     def test_config_file_persistence(self):
         import tempfile
         from pathlib import Path
@@ -540,8 +547,57 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertEqual(len(updates), 2)
             self.assertEqual(updates[-1].thumbnail_bytes, b"fake_jpeg_bytes")
 
+    def test_ignored_apps_removal_and_restoration(self):
+        import tempfile
+        from pathlib import Path
+        from ui_webview import WebViewApi
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_config_path = Path(tmpdir) / "ignore_config.json"
+            cfg = Config(custom_path=tmp_config_path)
+            client = HubClient(cfg.hub_url, mode=cfg.mode)
+
+            changed = False
+            def on_changed():
+                nonlocal changed
+                changed = True
+
+            api = WebViewApi(cfg, client, on_changed)
+
+            # 1. Register some apps
+            cfg.register_detected_app("MSTeams_8wekyb3d8bbwe!MSTeams")
+            cfg.register_detected_app("Spotify.exe")
+            cfg.register_detected_app("RiotClientServices.exe")
+            self.assertIn("Spotify.exe", cfg.detected_apps)
+            self.assertIn("MSTeams_8wekyb3d8bbwe!MSTeams", cfg.detected_apps)
+
+            # 2. Remove unwanted background apps via API
+            res = api.remove_app("MSTeams_8wekyb3d8bbwe!MSTeams")
+            self.assertTrue(res["success"])
+            self.assertNotIn("MSTeams_8wekyb3d8bbwe!MSTeams", cfg.detected_apps)
+            self.assertTrue(cfg.is_app_ignored("MSTeams_8wekyb3d8bbwe!MSTeams"))
+            self.assertIn("MSTeams_8wekyb3d8bbwe!MSTeams", res["ignored_apps"])
+
+            # 3. Attempt to re-register the ignored app (as media_listener would during scan)
+            is_new = cfg.register_detected_app("MSTeams_8wekyb3d8bbwe!MSTeams")
+            self.assertFalse(is_new)
+            self.assertNotIn("MSTeams_8wekyb3d8bbwe!MSTeams", cfg.detected_apps)
+
+            # 4. Also verify is_app_allowed blocks ignored apps regardless of filter mode
+            cfg.filter_mode = "off"
+            self.assertFalse(cfg.is_app_allowed("MSTeams_8wekyb3d8bbwe!MSTeams"))
+            self.assertTrue(cfg.is_app_allowed("Spotify.exe"))
+
+            # 5. Restore app
+            res_restore = api.restore_app("MSTeams_8wekyb3d8bbwe!MSTeams")
+            self.assertTrue(res_restore["success"])
+            self.assertFalse(cfg.is_app_ignored("MSTeams_8wekyb3d8bbwe!MSTeams"))
+            self.assertIn("MSTeams_8wekyb3d8bbwe!MSTeams", cfg.detected_apps)
+            self.assertTrue(cfg.is_app_allowed("MSTeams_8wekyb3d8bbwe!MSTeams"))
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

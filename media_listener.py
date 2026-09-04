@@ -100,6 +100,8 @@ class MediaListener:
     def _register_app_if_new(self, app_id: str):
         if not app_id or not self.config:
             return
+        if self.config.is_app_ignored(app_id):
+            return
         is_new = self.config.register_detected_app(app_id)
         if is_new and self.on_detected_apps_changed:
             try:
@@ -118,8 +120,15 @@ class MediaListener:
                 for s in raw_sessions:
                     try:
                         app_id = s.source_app_user_model_id or ""
-                        if app_id:
-                            self._register_app_if_new(app_id)
+                        if app_id and not (self.config and self.config.is_app_ignored(app_id)):
+                            # Only register if session is active (playing or paused)
+                            try:
+                                pb = s.get_playback_info()
+                                st = pb.playback_status if pb else None
+                                if st in (STATUS_PLAYING, wmc.GlobalSystemMediaTransportControlsSessionPlaybackStatus.PAUSED):
+                                    self._register_app_if_new(app_id)
+                            except Exception:
+                                pass
                         self._attach_session_events(s)
                         sessions.append(s)
                     except Exception as e:
@@ -222,7 +231,7 @@ class MediaListener:
             if current_session:
                 try:
                     curr_id = current_session.source_app_user_model_id or ""
-                    if curr_id:
+                    if curr_id and not (self.config and self.config.is_app_ignored(curr_id)):
                         self._register_app_if_new(curr_id)
                     self._attach_session_events(current_session)
                 except Exception:
@@ -247,6 +256,10 @@ class MediaListener:
             for s in candidate_sessions:
                 try:
                     app_id = s.source_app_user_model_id or ""
+                    if not app_id:
+                        continue
+                    if self.config and self.config.is_app_ignored(app_id):
+                        continue
                     is_allowed = self._is_allowed(app_id)
                     pb = s.get_playback_info()
                     status = pb.playback_status if pb else None

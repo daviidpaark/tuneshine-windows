@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.3"
+APP_VERSION = "0.3.4"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "blacklist": [],
     "whitelist": [],
     "detected_apps": {},
+    "ignored_apps": [],
 }
 
 KNOWN_APP_NAMES = {
@@ -127,7 +128,63 @@ def get_config_dir() -> Path:
 
 
 def get_config_path() -> Path:
+    """Returns the path to the configuration file (config.json)."""
     return get_config_dir() / "config.json"
+
+
+def normalize_app_tokens(name: str) -> set:
+    """Extracts fuzzy matching tokens from an application ID or executable name."""
+    if not name:
+        return set()
+    s = name.strip().lower()
+    base = Path(s).name.lower()
+    if base.endswith(".exe"):
+        base = base[:-4]
+
+    tokens = {s, base, base.replace(" ", "")}
+    if "!" in s:
+        for part in s.split("!"):
+            if part:
+                tokens.add(part)
+                if "_" in part:
+                    tokens.add(part.split("_")[0])
+                if "." in part:
+                    tokens.add(part.split(".")[-1])
+    tokens.add(base.replace(".exe", ""))
+    tokens.add(base.replace(".app", ""))
+    tokens.add(s.replace(".exe", ""))
+    if "-" in base:
+        for p in base.split("-"):
+            if p and p not in ("exe", "app", "win"):
+                tokens.add(p)
+                tokens.add(p.replace(" ", ""))
+    if "_" in base:
+        for p in base.split("_"):
+            if p and p not in ("exe", "app", "win"):
+                tokens.add(p)
+                tokens.add(p.replace(" ", ""))
+    if "." in base:
+        for p in base.split("."):
+            if p and p not in ("exe", "app", "win"):
+                tokens.add(p)
+                tokens.add(p.replace(" ", ""))
+    return {t for t in tokens if t and t not in ("exe", "app", "win")}
+
+
+def match_app_names(rule: str, target: str) -> bool:
+    """Matches an app rule against a target app name or ID using token intersection and substrings."""
+    if not rule or not target:
+        return False
+    r_set = normalize_app_tokens(rule)
+    t_set = normalize_app_tokens(target)
+    if r_set.intersection(t_set):
+        return True
+    for r in r_set:
+        if len(r) >= 4:
+            for t in t_set:
+                if len(t) >= 4 and (r in t or t in r):
+                    return True
+    return False
 
 
 class Config:
@@ -315,64 +372,62 @@ class Config:
         self.data["detected_apps"] = dict(value)
         self.save()
 
+    @property
+    def ignored_apps(self) -> list:
+        return list(self.data.get("ignored_apps", DEFAULT_CONFIG["ignored_apps"]))
+
+    @ignored_apps.setter
+    def ignored_apps(self, value: list):
+        self.data["ignored_apps"] = list(value)
+        self.save()
+
+    def is_app_ignored(self, app_id: str) -> bool:
+        """Returns True if the app is marked as ignored."""
+        if not app_id:
+            return False
+        for ign in self.ignored_apps:
+            if match_app_names(ign, app_id):
+                return True
+        return False
+
+    def ignore_app(self, app_id: str):
+        """Adds an app to the ignored_apps list."""
+        if not app_id:
+            return
+        clean_id = app_id.strip()
+        ignored = [x for x in self.ignored_apps if not match_app_names(x, clean_id)]
+        ignored.append(clean_id)
+        self.data["ignored_apps"] = ignored
+        self.save()
+
+    def unignore_app(self, app_id: str):
+        """Removes an app from the ignored_apps list."""
+        if not app_id:
+            return
+        self.data["ignored_apps"] = [x for x in self.ignored_apps if not match_app_names(x, app_id)]
+        self.save()
+
     def is_app_allowed(self, app_id: str) -> bool:
         """Determines whether a media session from app_id is permitted based on current filter settings."""
         if not app_id:
             return True
 
+        if self.is_app_ignored(app_id):
+            return False
+
         mode = self.filter_mode
         if mode in ("off", "none", "all"):
             return True
 
-        def _normalize_app(name: str) -> set:
-            if not name:
-                return set()
-            s = name.strip().lower()
-            base = Path(s).name.lower()
-            if base.endswith(".exe"):
-                base = base[:-4]
-
-            tokens = {s, base, base.replace(" ", "")}
-            if "!" in base:
-                for p in base.split("!"):
-                    if p and p not in ("exe", "app", "win"):
-                        tokens.add(p)
-                        tokens.add(p.replace(" ", ""))
-            if "_" in base:
-                for p in base.split("_"):
-                    if p and p not in ("exe", "app", "win"):
-                        tokens.add(p)
-                        tokens.add(p.replace(" ", ""))
-            if "." in base:
-                for p in base.split("."):
-                    if p and p not in ("exe", "app", "win"):
-                        tokens.add(p)
-                        tokens.add(p.replace(" ", ""))
-            return {t for t in tokens if t and t not in ("exe", "app", "win")}
-
-        def _match(rule: str, target: str) -> bool:
-            if not rule or not target:
-                return False
-            r_set = _normalize_app(rule)
-            t_set = _normalize_app(target)
-            if r_set.intersection(t_set):
-                return True
-            for r in r_set:
-                if len(r) >= 4:
-                    for t in t_set:
-                        if len(t) >= 4 and (r in t or t in r):
-                            return True
-            return False
-
         if mode in ("block", "blacklist"):
             for blocked in self.blocked_apps:
-                if _match(blocked, app_id):
+                if match_app_names(blocked, app_id):
                     return False
             return True
 
         if mode in ("allow", "whitelist"):
             for allowed in self.allowed_apps:
-                if _match(allowed, app_id):
+                if match_app_names(allowed, app_id):
                     return True
             return False
 
@@ -384,6 +439,9 @@ class Config:
             return False
 
         clean_id = app_id.strip()
+        if self.is_app_ignored(clean_id):
+            return False
+
         detected = dict(self.data.get("detected_apps", {}))
 
         # Check if already present under same or normalized key
@@ -415,16 +473,20 @@ class Config:
         return is_new
 
     def remove_detected_app(self, app_id: str):
-        """Removes an app from detected_apps and any blacklist/whitelist."""
+        """Removes an app from detected_apps and any blacklist/whitelist, and adds to ignored_apps."""
         if not app_id:
             return
-        clean_id = app_id.strip().lower()
+        clean_id = app_id.strip()
 
-        detected = {k: v for k, v in self.detected_apps.items() if k.strip().lower() != clean_id}
+        detected = {k: v for k, v in self.detected_apps.items() if not match_app_names(k, clean_id)}
         self.data["detected_apps"] = detected
 
-        self.data["whitelist"] = [x for x in self.whitelist if x.strip().lower() != clean_id]
-        self.data["blacklist"] = [x for x in self.blacklist if x.strip().lower() != clean_id]
+        self.data["whitelist"] = [x for x in self.whitelist if not match_app_names(x, clean_id)]
+        self.data["blacklist"] = [x for x in self.blacklist if not match_app_names(x, clean_id)]
+
+        ignored = [x for x in self.ignored_apps if not match_app_names(x, clean_id)]
+        ignored.append(clean_id)
+        self.data["ignored_apps"] = ignored
         self.save()
 
     def set_app_filter_state(self, app_id: str, state: str):
