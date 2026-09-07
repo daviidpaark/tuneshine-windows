@@ -5,6 +5,16 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-09-07
+
+### Fixed
+- **Reverse-Domain App Collision Protection:** Filtered generic top-level domain prefixes (`com`, `org`, `net`, etc.) and system tags (`desktop`, `client`, `player`, `exe`, `win`, etc.) from fuzzy matching tokens in `match_app_names`. Prevents reverse-domain package IDs (e.g. `com.deezer.deezer-desktop` and `com.riotgames.RiotGames.RiotClient`) from colliding and unintentionally cross-ignoring or wiping each other.
+- **Exact Stem Comparison:** Added direct base executable stem matching in `match_app_names` to accurately link executable variants (e.g. `spotify.exe` vs `spotify`) without broad substring collisions.
+
+### Changed
+- **Music & Media Friendly Name Scope:** Trimmed `KNOWN_APP_NAMES` and package heuristics to strictly focus on music and media playback applications. Non-media background applications (browsers, game clients, chat apps) format cleanly via their executable name without generic aliases.
+- **Reverse-Domain Name Formatting:** Added reverse-domain stripping to `get_friendly_app_name` so package IDs like `com.deezer.deezer-desktop` automatically resolve to clean display names (`Deezer`) without requiring manual renaming.
+
 ---
 
 ## [0.3.4] - 2026-09-04

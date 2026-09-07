@@ -211,13 +211,16 @@ class TestTuneshineWindows(unittest.TestCase):
         from config import get_friendly_app_name
         self.assertEqual(get_friendly_app_name("Spotify.exe"), "Spotify")
         self.assertEqual(get_friendly_app_name("spotify"), "Spotify")
-        self.assertEqual(get_friendly_app_name("chrome.exe"), "Google Chrome")
-        self.assertEqual(get_friendly_app_name("msedge.exe"), "Microsoft Edge")
         self.assertEqual(get_friendly_app_name("AppleInc.AppleMusicWin_8wekyb3d8bbwe!App"), "Apple Music")
         self.assertEqual(get_friendly_app_name("vlc.exe"), "VLC Media Player")
         self.assertEqual(get_friendly_app_name("foobar2000.exe"), "foobar2000")
+        self.assertEqual(get_friendly_app_name("tidal.exe"), "TIDAL")
         self.assertEqual(get_friendly_app_name("cider.exe"), "Cider (Apple Music)")
         self.assertEqual(get_friendly_app_name("my_custom_player.exe"), "My Custom Player")
+        self.assertEqual(get_friendly_app_name("com.deezer.deezer-desktop"), "Deezer")
+        self.assertEqual(get_friendly_app_name("deezer"), "Deezer")
+        self.assertEqual(get_friendly_app_name("deezer.exe"), "Deezer")
+        self.assertEqual(get_friendly_app_name("musicbee.exe"), "MusicBee")
 
     def test_config_filter_logic(self):
         import tempfile
@@ -413,6 +416,15 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertFalse(cfg.is_app_allowed("plezy.exe"))
             self.assertFalse(cfg.is_app_allowed("chrome.exe"))
 
+            # Reverse-domain app ID isolation (e.g. Deezer vs Riot Games should not collide on 'com' or 'desktop')
+            from config import match_app_names
+            self.assertFalse(match_app_names("com.deezer.deezer-desktop", "com.riotgames.RiotGames.RiotClient"))
+            self.assertFalse(match_app_names("com.riotgames.RiotGames.RiotClient", "com.deezer.deezer-desktop"))
+            self.assertFalse(match_app_names("com.spotify.client", "com.videolan.vlc"))
+            self.assertFalse(match_app_names("slack-desktop.exe", "com.deezer.deezer-desktop"))
+            self.assertTrue(match_app_names("deezer", "com.deezer.deezer-desktop"))
+            self.assertTrue(match_app_names("com.deezer.deezer-desktop", "com.deezer.deezer-desktop"))
+
     def test_listener_session_priority_and_selection(self):
         import tempfile
         from pathlib import Path
@@ -594,6 +606,24 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertFalse(cfg.is_app_ignored("MSTeams_8wekyb3d8bbwe!MSTeams"))
             self.assertIn("MSTeams_8wekyb3d8bbwe!MSTeams", cfg.detected_apps)
             self.assertTrue(cfg.is_app_allowed("MSTeams_8wekyb3d8bbwe!MSTeams"))
+
+            # 6. Verify reverse-domain apps (e.g. Deezer vs Riot Games) do not link or delete each other
+            cfg.register_detected_app("com.deezer.deezer-desktop")
+            cfg.register_detected_app("com.riotgames.RiotGames.RiotClient")
+            cfg.set_app_filter_state("com.deezer.deezer-desktop", "allow")
+            self.assertIn("com.deezer.deezer-desktop", cfg.detected_apps)
+            self.assertIn("com.riotgames.RiotGames.RiotClient", cfg.detected_apps)
+            self.assertIn("com.deezer.deezer-desktop", cfg.allowed_apps)
+
+            res_remove_riot = api.remove_app("com.riotgames.RiotGames.RiotClient")
+            self.assertTrue(res_remove_riot["success"])
+            self.assertNotIn("com.riotgames.RiotGames.RiotClient", cfg.detected_apps)
+            self.assertIn("com.riotgames.RiotGames.RiotClient", cfg.ignored_apps)
+            # Deezer must remain intact and allowed
+            self.assertIn("com.deezer.deezer-desktop", cfg.detected_apps)
+            self.assertIn("com.deezer.deezer-desktop", cfg.allowed_apps)
+            self.assertFalse(cfg.is_app_ignored("com.deezer.deezer-desktop"))
+            self.assertTrue(cfg.is_app_allowed("com.deezer.deezer-desktop"))
 
 
 if __name__ == "__main__":

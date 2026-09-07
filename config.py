@@ -9,7 +9,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.4"
+APP_VERSION = "0.3.5"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -26,37 +26,49 @@ DEFAULT_CONFIG = {
 }
 
 KNOWN_APP_NAMES = {
+    # Music streaming services & desktop clients
     "spotify.exe": "Spotify",
     "spotify": "Spotify",
-    "chrome.exe": "Google Chrome",
-    "msedge.exe": "Microsoft Edge",
-    "firefox.exe": "Mozilla Firefox",
-    "brave.exe": "Brave Browser",
-    "opera.exe": "Opera",
-    "opera_gx.exe": "Opera GX",
-    "vivaldi.exe": "Vivaldi",
-    "vlc.exe": "VLC Media Player",
-    "foobar2000.exe": "foobar2000",
-    "tidal.exe": "TIDAL",
     "deezer.exe": "Deezer",
+    "deezer": "Deezer",
+    "com.deezer.deezer-desktop": "Deezer",
+    "tidal.exe": "TIDAL",
+    "tidal": "TIDAL",
+    "qobuz.exe": "Qobuz",
+    "qobuz": "Qobuz",
+    "cider.exe": "Cider (Apple Music)",
+    "cider": "Cider (Apple Music)",
+    "itunes.exe": "iTunes",
+    "itunes": "iTunes",
+    "plexamp.exe": "Plexamp",
+    "plexamp": "Plexamp",
+
+    # Local music players & audio workstations
     "musicbee.exe": "MusicBee",
-    "plezy.exe": "Plezy",
+    "musicbee": "MusicBee",
+    "foobar2000.exe": "foobar2000",
+    "foobar2000": "foobar2000",
+    "aimp.exe": "AIMP",
+    "aimp": "AIMP",
+    "winamp.exe": "Winamp",
+    "winamp": "Winamp",
+    "dopamine.exe": "Dopamine",
+    "dopamine": "Dopamine",
+    "audacity.exe": "Audacity",
+    "audacity": "Audacity",
+
+    # Media players & library clients
+    "vlc.exe": "VLC Media Player",
+    "vlc": "VLC Media Player",
+    "wmplayer.exe": "Windows Media Player",
     "plex.exe": "Plex",
     "plex": "Plex",
+    "plezy.exe": "Plezy",
+    "plezy": "Plezy",
     "mpv.exe": "MPV",
     "mpv": "MPV",
     "fladder.exe": "Fladder",
     "fladder": "Fladder",
-    "cider.exe": "Cider (Apple Music)",
-    "aimp.exe": "AIMP",
-    "winamp.exe": "Winamp",
-    "wmplayer.exe": "Windows Media Player",
-    "itunes.exe": "iTunes",
-    "discord.exe": "Discord",
-    "audacity.exe": "Audacity",
-    "telegram.exe": "Telegram",
-    "plexamp.exe": "Plexamp",
-    "dopamine.exe": "Dopamine",
 }
 
 
@@ -79,17 +91,21 @@ def get_friendly_app_name(app_id: str) -> str:
     if stem_lower in KNOWN_APP_NAMES:
         return KNOWN_APP_NAMES[stem_lower]
 
-    # UWP / Package Family Name heuristics
+    # UWP / Package Family Name heuristics for music & media
+    if "deezer" in lower_id:
+        return "Deezer"
     if "applemusic" in lower_id:
         return "Apple Music"
     if "zunemusic" in lower_id or "microsoft.zunemusic" in lower_id:
         return "Windows Media Player"
     if "spotify" in lower_id:
         return "Spotify"
-    if "amazonmusic" in lower_id:
+    if "amazonmusic" in lower_id or "amazon music" in lower_id:
         return "Amazon Music"
     if "tidal" in lower_id:
         return "TIDAL"
+    if "qobuz" in lower_id:
+        return "Qobuz"
 
     if "!" in clean_id:
         part = clean_id.split("!")[0]
@@ -103,6 +119,16 @@ def get_friendly_app_name(app_id: str) -> str:
     name = Path(clean_id).name
     if name.lower().endswith(".exe"):
         name = name[:-4]
+
+    # Strip reverse-domain prefixes like com., org., net.
+    parts = name.split(".")
+    if len(parts) >= 2 and parts[0].lower() in ("com", "org", "net", "io", "co", "app", "dev"):
+        if len(parts) >= 3 and parts[-1].lower() in ("desktop", "client", "player", "app", "ui"):
+            name = f"{parts[1]} {parts[-1]}"
+        elif len(parts[-1]) > 2:
+            name = parts[-1]
+        else:
+            name = " ".join(parts[1:])
 
     return name.replace("_", " ").replace("-", " ").strip().title()
 
@@ -132,8 +158,18 @@ def get_config_path() -> Path:
     return get_config_dir() / "config.json"
 
 
+GENERIC_APP_TOKENS = {
+    # Common TLDs and reverse-domain package prefixes
+    "com", "org", "net", "io", "co", "app", "dev", "me", "edu", "gov", "mil",
+    # Executable, OS, and platform tags
+    "exe", "win", "windows", "desktop", "client", "player", "media", "audio",
+    "service", "host", "helper", "launcher", "main", "ui", "web", "browser",
+    "system", "default", "x64", "x86", "64", "32", "v1", "v2",
+}
+
+
 def normalize_app_tokens(name: str) -> set:
-    """Extracts fuzzy matching tokens from an application ID or executable name."""
+    """Extracts fuzzy matching tokens from an application ID or executable name, excluding generic tokens."""
     if not name:
         return set()
     s = name.strip().lower()
@@ -141,48 +177,63 @@ def normalize_app_tokens(name: str) -> set:
     if base.endswith(".exe"):
         base = base[:-4]
 
-    tokens = {s, base, base.replace(" ", "")}
+    raw_tokens = {s, base, base.replace(" ", "")}
     if "!" in s:
         for part in s.split("!"):
             if part:
-                tokens.add(part)
+                raw_tokens.add(part)
                 if "_" in part:
-                    tokens.add(part.split("_")[0])
+                    raw_tokens.add(part.split("_")[0])
                 if "." in part:
-                    tokens.add(part.split(".")[-1])
-    tokens.add(base.replace(".exe", ""))
-    tokens.add(base.replace(".app", ""))
-    tokens.add(s.replace(".exe", ""))
+                    raw_tokens.add(part.split(".")[-1])
+    raw_tokens.add(base.replace(".exe", ""))
+    raw_tokens.add(base.replace(".app", ""))
+    raw_tokens.add(s.replace(".exe", ""))
     if "-" in base:
         for p in base.split("-"):
-            if p and p not in ("exe", "app", "win"):
-                tokens.add(p)
-                tokens.add(p.replace(" ", ""))
+            if p:
+                raw_tokens.add(p)
+                raw_tokens.add(p.replace(" ", ""))
     if "_" in base:
         for p in base.split("_"):
-            if p and p not in ("exe", "app", "win"):
-                tokens.add(p)
-                tokens.add(p.replace(" ", ""))
+            if p:
+                raw_tokens.add(p)
+                raw_tokens.add(p.replace(" ", ""))
     if "." in base:
         for p in base.split("."):
-            if p and p not in ("exe", "app", "win"):
-                tokens.add(p)
-                tokens.add(p.replace(" ", ""))
-    return {t for t in tokens if t and t not in ("exe", "app", "win")}
+            if p:
+                raw_tokens.add(p)
+                raw_tokens.add(p.replace(" ", ""))
+    return {t for t in raw_tokens if t and len(t) > 1 and t not in GENERIC_APP_TOKENS}
 
 
 def match_app_names(rule: str, target: str) -> bool:
-    """Matches an app rule against a target app name or ID using token intersection and substrings."""
+    """Matches an app rule against a target app name or ID using exact stem, token intersection, and substrings."""
     if not rule or not target:
         return False
+    r_clean = rule.strip().lower()
+    t_clean = target.strip().lower()
+    if r_clean == t_clean:
+        return True
+
+    # Exact base stem comparison (e.g. "spotify.exe" vs "spotify")
+    r_stem = Path(r_clean).name
+    t_stem = Path(t_clean).name
+    if r_stem.endswith(".exe"):
+        r_stem = r_stem[:-4]
+    if t_stem.endswith(".exe"):
+        t_stem = t_stem[:-4]
+    if r_stem == t_stem and r_stem:
+        return True
+
     r_set = normalize_app_tokens(rule)
     t_set = normalize_app_tokens(target)
     if r_set.intersection(t_set):
         return True
     for r in r_set:
-        if len(r) >= 4:
+        if len(r) >= 4 and r not in GENERIC_APP_TOKENS:
             for t in t_set:
-                if len(t) >= 4 and (r in t or t in r):
+                if len(t) >= 4 and t not in GENERIC_APP_TOKENS and (r in t or t in r):
                     return True
     return False
 
