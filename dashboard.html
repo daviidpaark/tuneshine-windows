@@ -679,7 +679,7 @@
   <!-- 3. Connection Settings -->
   <div class="card">
     <div class="form-group">
-      <label class="form-label">Target Hub Address</label>
+      <label class="form-label">Target Address</label>
       <div class="input-row">
         <input type="text" id="hubUrl" placeholder="http://unraid:8585" onchange="autoSave()" onkeydown="if(event.key==='Enter'){manualSave();}">
         <button id="btnTest" class="btn-secondary" onclick="testConnection()">Ping</button>
@@ -690,7 +690,7 @@
       <label class="form-label">Operation Mode</label>
       <div class="segmented">
         <button id="modeHub" class="segmented-btn active" onclick="setMode('hub')">Tuneshine Hub</button>
-        <button id="modeDirect" class="segmented-btn" onclick="setMode('direct')">Direct Device</button>
+        <button id="modeDirect" class="segmented-btn" onclick="setMode('direct')">Direct to Device</button>
       </div>
     </div>
   </div>

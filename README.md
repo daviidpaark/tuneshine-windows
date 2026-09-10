@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight Windows System Tray desktop companion for [Tuneshine Hub](https://github.com/daviidpaark/tuneshine-hub) and [Tuneshine](https://www.tuneshine.rocks/) LED displays.
+A lightweight Windows system tray companion for [Tuneshine Hub](https://github.com/daviidpaark/tuneshine-hub) and [Tuneshine](https://www.tuneshine.rocks/) LED displays.
 
 Hooks directly into Windows 10/11's native **System Media Transport Controls (SMTC)** to capture real-time playback metadata and high-resolution album artwork from **any** Windows music or video player, pushing updates directly to Tuneshine Hub (or physical Tuneshine hardware) with zero setup and zero API rate limits.
 
@@ -33,9 +33,9 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 ## Features
 
-- **Dual Operation Modes:**
-  - **Tuneshine Hub (Offload Processing):** Passes raw cover art and metadata to a `tuneshine-hub` Docker instance, offloading WebP compression and multi-source arbitration.
-  - **Direct to Device (Standalone):** Converts cover art to 64×64 lossless WebP locally via Pillow and speaks directly to physical Tuneshine hardware without requiring Docker.
+- **Two Operation Modes:**
+  - **Tuneshine Hub:** Forwards raw cover art and metadata to a `tuneshine-hub` container for image processing and multi-source coordination.
+  - **Direct to Device:** Converts cover art to 64x64 lossless WebP locally via Pillow and sends it directly to a physical Tuneshine device without requiring Docker.
 - **Streamlined Program Filtering (Allow & Block):**
   - **Off (Allow All):** Every media player is permitted to sync (default).
   - **Block Mode:** Block specific applications (e.g. Chrome, Edge, Discord, games) to prevent unwanted video/audio clips from hijacking your display.
@@ -58,8 +58,8 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 | Mode | Target | Description |
 | :--- | :--- | :--- |
-| **`Tuneshine Hub`** *(Recommended)* | Tuneshine Hub (e.g. `http://unraid:8585` or `<hub-ip>:8585`) | Forwards raw cover art and playback events to the Hub Docker container for centralized arbitration and multi-device coordination. |
-| **`Direct to Device`** *(Standalone)* | Physical Tuneshine (e.g. `http://192.168.1.100` or `http://tuneshine.local`) | Converts cover art to 64×64 lossless WebP locally with Pillow and uploads directly to the physical Tuneshine device. |
+| **`Tuneshine Hub`** *(Recommended)* | Tuneshine Hub (e.g. `http://unraid:8585` or `<hub-ip>:8585`) | Forwards raw cover art and playback events to Hub for centralized arbitration and multi-device coordination. |
+| **`Direct to Device`** | Physical Tuneshine device (e.g. `http://192.168.1.100` or `http://tuneshine.local`) | Converts cover art to 64x64 lossless WebP locally with Pillow and uploads it directly to the device. |
 
 ---
 
@@ -107,7 +107,7 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 Double-click the square **Tuneshine** icon in your Windows System Tray (or right-click and select **Open Dashboard**) to manage all settings:
 
 - **Target Host / URL** — Set the address of your Hub (e.g. `http://localhost:8585` or `http://192.168.1.50:8585`) or physical Tuneshine.
-- **Operation Mode** — Switch between `Tuneshine Hub (Offload)` and `Direct to Device (Standalone)`.
+- **Operation Mode** — Switch between `Tuneshine Hub` and `Direct to Device`.
 - **Program Filtering** — Select `Off (Allow All)`, `Block Mode` (blacklist), or `Allow Mode` (whitelist) to control which apps are allowed to push artwork.
 - **Start Minimized to Tray** — Launch quietly in the system tray without popping up the dashboard window.
 - **Launch on Windows Startup** — Enable or disable automatic background start on Windows login.
