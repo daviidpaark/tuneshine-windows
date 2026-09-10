@@ -5,6 +5,12 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-09-10
+
+### Changed
+- **Operation Mode Labels:** Standardized the dashboard labels to `Tuneshine Hub` and `Direct to Device` so they match the Tuneshine ecosystem terminology.
+- **Target Address Label:** Updated the connection field label to cover both Hub and direct-device configurations.
+
 ## [0.3.5] - 2026-09-07
 
 ### Fixed
