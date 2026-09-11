@@ -5,6 +5,15 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2026-09-11
+
+### Fixed
+- **WinRT Session Event Registration Leak:** Fixed unbounded listener attachment where transient Python wrapper IDs caused `add_media_properties_changed` and `add_playback_info_changed` to repeatedly attach delegates to Windows COM sessions on every polling scan. Session listeners are now tracked by WinRT session instances with their exact `EventRegistrationToken`s, attached only once, and explicitly unregistered via `remove_media_properties_changed` and `remove_playback_info_changed` when sessions terminate or the app stops.
+- **Asyncio Task & Callback Flooding:** Coalesced rapid bursts of WinRT property and playback notifications into a single debounced check (50ms window) and guarded lock evaluation with single-rerun semantics, preventing runaway task queues and 100% CPU thread lockup.
+- **WinRT Thumbnail Stream Disposal:** Guaranteed `close()` execution on `DataReader` and `IRandomAccessStreamWithContentType` inside a `try ... finally` block, preventing unmanaged memory and handle retention.
+- **Webview JS Callback Leak & Tray Minimization:** Replaced `window.evaluate_js()` with `window.run_js()` to eliminate permanent retention of UUID keys in `window._callbacks`. Suppressed base64 encoding and webview IPC invocations when the dashboard window is hidden in the system tray.
+- **Tray Icon Redraw Caching:** Added state caching in `TrayApp.update_state()` to skip rebuilding the PIL Icon image and menu when playback status and tooltip are unchanged.
+
 ## [0.3.6] - 2026-09-10
 
 ### Changed

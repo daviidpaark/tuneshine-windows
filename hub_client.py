@@ -13,11 +13,18 @@ logger = logging.getLogger("tuneshine-windows.client")
 def convert_to_tuneshine_webp(raw_image_bytes: bytes) -> bytes:
     """Converts any input image to 64x64 lossless WebP for physical Tuneshine hardware."""
     with Image.open(io.BytesIO(raw_image_bytes)) as img:
-        img = img.convert("RGBA")
-        img = img.resize((64, 64), Image.Resampling.LANCZOS)
-        out = io.BytesIO()
-        img.save(out, format="WEBP", lossless=True)
-        return out.getvalue()
+        if img.mode != "RGBA":
+            converted = img.convert("RGBA")
+        else:
+            converted = img
+        try:
+            with converted.resize((64, 64), Image.Resampling.LANCZOS) as resized:
+                out = io.BytesIO()
+                resized.save(out, format="WEBP", lossless=True)
+                return out.getvalue()
+        finally:
+            if converted is not img:
+                converted.close()
 
 
 class HubClient:

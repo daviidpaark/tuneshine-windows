@@ -30,6 +30,7 @@ class TrayApp:
 
         self.current_status_text = "Idle"
         self.current_track_text = "No track playing"
+        self._last_rendered_state: Optional[tuple] = None
 
         self.icon = pystray.Icon(
             name="TuneshineWindows",
@@ -60,6 +61,7 @@ class TrayApp:
     def _toggle_sync(self, enabled: bool):
         self.config.enabled = enabled
         self.on_toggle_enabled(enabled)
+        self._last_rendered_state = None
         self.icon.menu = self._build_menu()
 
     def update_state(
@@ -70,6 +72,17 @@ class TrayApp:
         hub_error: Optional[str] = None,
     ):
         """Updates the tray icon color, tooltip, and menu state."""
+        state_key = (
+            bool(self.config.enabled),
+            bool(is_playing),
+            bool(is_paused),
+            track_summary,
+            hub_error,
+            self.config.mode,
+        )
+        if state_key == self._last_rendered_state:
+            return
+        self._last_rendered_state = state_key
         if not self.config.enabled:
             self.current_status_text = "Sync Disabled"
             self.current_track_text = "Paused by user"

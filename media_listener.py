@@ -57,36 +57,80 @@ class MediaListener:
         self.on_detected_apps_changed = on_detected_apps_changed
         self.manager: Optional[wmc.GlobalSystemMediaTransportControlsSessionManager] = None
         self.current_session: Optional[wmc.GlobalSystemMediaTransportControlsSession] = None
-        self._attached_session_ids: set = set()
+        self._manager_tokens: List[tuple] = []
+        self._attached_sessions: dict = {}  # session -> (props_token, playback_token)
         self._running = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._last_state_key: Optional[str] = None
         self.current_track: TrackInfo = TrackInfo(is_playing=False)
         self._check_lock: Optional[asyncio.Lock] = None
+        self._pending_check_task: Optional[asyncio.Task] = None
+        self._next_trigger: Optional[str] = None
+        self._rerun_needed: bool = False
 
-    async def start(self):
-        """Initializes WinRT session manager and begins listening."""
-        self._running = True
-        self._loop = asyncio.get_running_loop()
-        self._check_lock = asyncio.Lock()
+    async def _init_manager(self):
         try:
+            self._cleanup_manager_events()
             self.manager = await wmc.GlobalSystemMediaTransportControlsSessionManager.request_async()
-            self.manager.add_current_session_changed(self._on_current_session_changed)
+            tok1 = self.manager.add_current_session_changed(self._on_current_session_changed)
+            self._manager_tokens.append(("current_session", tok1))
             try:
-                self.manager.add_sessions_changed(self._on_sessions_changed)
+                tok2 = self.manager.add_sessions_changed(self._on_sessions_changed)
+                self._manager_tokens.append(("sessions", tok2))
             except Exception:
                 pass
             logger.info("WinRT Media Session Manager initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize WinRT Session Manager: {e}")
 
+    def _cleanup_manager_events(self):
+        if self.manager:
+            for kind, tok in self._manager_tokens:
+                try:
+                    if kind == "current_session":
+                        self.manager.remove_current_session_changed(tok)
+                    elif kind == "sessions":
+                        self.manager.remove_sessions_changed(tok)
+                except Exception:
+                    pass
+        self._manager_tokens.clear()
+
+    def _cleanup_session_events(self, session, tokens):
+        props_tok, play_tok = tokens
+        if props_tok is not None:
+            try:
+                session.remove_media_properties_changed(props_tok)
+            except Exception:
+                pass
+        if play_tok is not None:
+            try:
+                session.remove_playback_info_changed(play_tok)
+            except Exception:
+                pass
+
+    def _cleanup_all_session_events(self):
+        for s, tokens in list(self._attached_sessions.items()):
+            self._cleanup_session_events(s, tokens)
+        self._attached_sessions.clear()
+
+    async def start(self):
+        """Initializes WinRT session manager and begins listening."""
+        self._running = True
+        self._loop = asyncio.get_running_loop()
+        self._check_lock = asyncio.Lock()
+        await self._init_manager()
+
         # Start the background sync loop (handles active polling & event fallbacks)
         asyncio.create_task(self._sync_loop())
 
     def stop(self):
         self._running = False
+        if self._pending_check_task and not self._pending_check_task.done():
+            self._pending_check_task.cancel()
+        self._cleanup_all_session_events()
+        self._cleanup_manager_events()
         self.current_session = None
-        self._attached_session_ids.clear()
+        self.manager = None
 
     def invalidate_state(self):
         """Forces the next check_current_media call to re-evaluate and emit state."""
@@ -133,59 +177,89 @@ class MediaListener:
                         sessions.append(s)
                     except Exception as e:
                         logger.debug(f"Error inspecting individual session: {e}")
+
+            # Prune listeners from sessions no longer active on Windows
+            current_active = set(sessions)
+            for s in list(self._attached_sessions.keys()):
+                if s not in current_active:
+                    tokens = self._attached_sessions.pop(s)
+                    self._cleanup_session_events(s, tokens)
+
         except Exception as e:
             logger.debug(f"Could not enumerate all sessions: {e}")
             # If session enumeration failed due to COM disconnect, trigger re-request
             err_str = str(e).lower()
-            if "disconnected" in err_str or "closed" in err_str:
+            if "disconnected" in err_str or "closed" in err_str or "0x80010108" in err_str:
+                self._cleanup_all_session_events()
+                self._cleanup_manager_events()
                 self.manager = None
         return sessions
 
+    def _schedule_check(self, trigger: str):
+        """Coalesces and debounces media state checks to avoid queue flooding."""
+        if not self._running or not self._loop or self._loop.is_closed():
+            return
+
+        def _enqueue():
+            self._next_trigger = trigger
+            if self._pending_check_task and not self._pending_check_task.done():
+                return
+
+            async def _debounced_worker():
+                try:
+                    await asyncio.sleep(0.05)  # 50ms coalesce window
+                    if self._running:
+                        await self.check_current_media(trigger=self._next_trigger or "event")
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.debug(f"Error in debounced check worker: {e}")
+
+            self._pending_check_task = asyncio.create_task(_debounced_worker())
+
+        try:
+            self._loop.call_soon_threadsafe(_enqueue)
+        except RuntimeError:
+            pass
+
     def _on_sessions_changed(self, sender, args):
         """WinRT event handler for session list changed."""
-        if self._loop and self._running:
-            self._loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self.check_current_media(trigger="sessions_changed"))
-            )
+        self._schedule_check("sessions_changed")
 
     def _on_current_session_changed(self, sender, args):
         """WinRT event handler for active media session change."""
-        if self._loop and self._running:
-            self._loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self.check_current_media(trigger="session_changed"))
-            )
+        self._schedule_check("session_changed")
 
     def _on_media_properties_changed(self, sender, args):
         """WinRT event handler for title/artist/album/art changes."""
-        if self._loop and self._running:
-            self._loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self.check_current_media(trigger="props_changed"))
-            )
+        self._schedule_check("props_changed")
 
     def _on_playback_info_changed(self, sender, args):
         """WinRT event handler for play/pause/stop changes."""
-        if self._loop and self._running:
-            self._loop.call_soon_threadsafe(
-                lambda: asyncio.create_task(self.check_current_media(trigger="playback_changed"))
-            )
+        self._schedule_check("playback_changed")
 
     def _attach_session_events(self, session: wmc.GlobalSystemMediaTransportControlsSession):
-        if not session:
+        if not session or session in self._attached_sessions:
             return
+        props_tok = None
+        play_tok = None
         try:
-            session_id = str(id(session))
-            if session_id in self._attached_session_ids:
-                return
-            session.add_media_properties_changed(self._on_media_properties_changed)
-            session.add_playback_info_changed(self._on_playback_info_changed)
-            self._attached_session_ids.add(session_id)
+            props_tok = session.add_media_properties_changed(self._on_media_properties_changed)
         except Exception as e:
-            logger.debug(f"Could not attach session event listeners: {e}")
+            logger.debug(f"Could not attach media_properties_changed listener: {e}")
+        try:
+            play_tok = session.add_playback_info_changed(self._on_playback_info_changed)
+        except Exception as e:
+            logger.debug(f"Could not attach playback_info_changed listener: {e}")
+
+        self._attached_sessions[session] = (props_tok, play_tok)
 
     async def _read_thumbnail(self, thumbnail_ref) -> Optional[bytes]:
         """Reads the IRandomAccessStreamReference into bytes safely."""
         if not thumbnail_ref:
             return None
+        stream = None
+        reader = None
         try:
             stream = await thumbnail_ref.open_read_async()
             if not stream or stream.size == 0:
@@ -198,6 +272,17 @@ class MediaListener:
         except Exception as e:
             logger.debug(f"Error reading thumbnail stream: {e}")
             return None
+        finally:
+            if reader is not None:
+                try:
+                    reader.close()
+                except Exception:
+                    pass
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    pass
 
     async def check_current_media(self, trigger: str = "poll"):
         """Inspects media sessions with filter awareness and multi-tier priority selection."""
@@ -207,16 +292,22 @@ class MediaListener:
         if self._check_lock is None:
             self._check_lock = asyncio.Lock()
 
-        # Prevent overlapping concurrent evaluations
+        # If already executing or waiting on lock, signal rerun needed and return immediately
+        if self._check_lock.locked():
+            self._rerun_needed = True
+            return
+
         async with self._check_lock:
+            self._rerun_needed = False
             await self._check_current_media_unlocked(trigger=trigger)
+            if self._rerun_needed and self._running:
+                self._rerun_needed = False
+                await self._check_current_media_unlocked(trigger="rerun")
 
     async def _check_current_media_unlocked(self, trigger: str = "poll"):
         if not self.manager:
-            try:
-                self.manager = await wmc.GlobalSystemMediaTransportControlsSessionManager.request_async()
-                self._attached_session_ids.clear()
-            except Exception:
+            await self._init_manager()
+            if not self.manager:
                 return
 
         try:
@@ -420,8 +511,9 @@ class MediaListener:
             err_str = str(e).lower()
             if "disconnected" in err_str or "closed" in err_str or "0x80010108" in err_str:
                 logger.info("WinRT session manager connection dropped, will re-request on next cycle")
+                self._cleanup_all_session_events()
+                self._cleanup_manager_events()
                 self.manager = None
-                self._attached_session_ids.clear()
 
     async def _sync_loop(self):
         """Adaptive periodic sync loop to ensure display stays in sync."""

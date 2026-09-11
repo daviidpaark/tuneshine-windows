@@ -625,9 +625,172 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertFalse(cfg.is_app_ignored("com.deezer.deezer-desktop"))
             self.assertTrue(cfg.is_app_allowed("com.deezer.deezer-desktop"))
 
+    def test_media_listener_session_event_attachment_and_cleanup(self):
+        import tempfile
+        from pathlib import Path
+        from media_listener import MediaListener, STATUS_PLAYING
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "cfg.json")
+            listener = MediaListener(on_update=AsyncMock(), config=cfg)
+            listener._running = True
+
+            session1 = MagicMock()
+            session1.source_app_user_model_id = "Spotify.exe"
+            session1.get_playback_info.return_value.playback_status = STATUS_PLAYING
+            token1_p = MagicMock()
+            token1_pb = MagicMock()
+            session1.add_media_properties_changed.return_value = token1_p
+            session1.add_playback_info_changed.return_value = token1_pb
+
+            session2 = MagicMock()
+            session2.source_app_user_model_id = "Deezer.exe"
+            session2.get_playback_info.return_value.playback_status = STATUS_PLAYING
+            token2_p = MagicMock()
+            token2_pb = MagicMock()
+            session2.add_media_properties_changed.return_value = token2_p
+            session2.add_playback_info_changed.return_value = token2_pb
+
+            mock_mgr = MagicMock()
+            mock_mgr.get_sessions.return_value = [session1, session2]
+            listener.manager = mock_mgr
+
+            # Initial scan: both sessions attached
+            listener._scan_all_sessions()
+            self.assertEqual(len(listener._attached_sessions), 2)
+            self.assertEqual(session1.add_media_properties_changed.call_count, 1)
+            self.assertEqual(session1.add_playback_info_changed.call_count, 1)
+            self.assertEqual(session2.add_media_properties_changed.call_count, 1)
+            self.assertEqual(session2.add_playback_info_changed.call_count, 1)
+
+            # Subsequent scan with same sessions: MUST NOT re-attach or leak listeners
+            listener._scan_all_sessions()
+            self.assertEqual(session1.add_media_properties_changed.call_count, 1)
+            self.assertEqual(session2.add_media_properties_changed.call_count, 1)
+            self.assertEqual(len(listener._attached_sessions), 2)
+
+            # Session2 terminates: must be pruned and event listeners removed
+            mock_mgr.get_sessions.return_value = [session1]
+            listener._scan_all_sessions()
+            self.assertEqual(len(listener._attached_sessions), 1)
+            self.assertIn(session1, listener._attached_sessions)
+            self.assertNotIn(session2, listener._attached_sessions)
+            session2.remove_media_properties_changed.assert_called_once_with(token2_p)
+            session2.remove_playback_info_changed.assert_called_once_with(token2_pb)
+
+            # Listener stop: cleans up all remaining sessions
+            listener.stop()
+            self.assertEqual(len(listener._attached_sessions), 0)
+            session1.remove_media_properties_changed.assert_called_once_with(token1_p)
+            session1.remove_playback_info_changed.assert_called_once_with(token1_pb)
+
+    def test_media_listener_debounced_schedule_check(self):
+        import tempfile
+        from pathlib import Path
+        from media_listener import MediaListener
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "cfg.json")
+            listener = MediaListener(on_update=AsyncMock(), config=cfg)
+            listener._running = True
+
+            loop = asyncio.new_event_loop()
+            listener._loop = loop
+            check_mock = AsyncMock()
+            listener.check_current_media = check_mock
+
+            # Rapid triggers
+            listener._schedule_check("props_changed")
+            listener._schedule_check("props_changed")
+            listener._schedule_check("playback_changed")
+
+            # Run loop to process the debounced task
+            loop.run_until_complete(asyncio.sleep(0.08))
+            loop.close()
+
+            # Debouncing should coalesce rapid bursts into a single execution
+            self.assertEqual(check_mock.call_count, 1)
+            self.assertEqual(check_mock.call_args[1].get("trigger"), "playback_changed")
+
+    def test_thumbnail_stream_disposal(self):
+        from media_listener import MediaListener
+        listener = MediaListener(on_update=AsyncMock())
+
+        mock_stream = MagicMock()
+        mock_stream.size = 100
+        mock_thumb_ref = MagicMock()
+        mock_thumb_ref.open_read_async = AsyncMock(return_value=mock_stream)
+
+        with patch("media_listener.wss.DataReader") as mock_reader_cls:
+            mock_reader = MagicMock()
+            mock_reader.load_async = AsyncMock()
+            mock_reader_cls.return_value = mock_reader
+
+            # Test successful read closes both reader and stream
+            res = asyncio.run(listener._read_thumbnail(mock_thumb_ref))
+            self.assertIsNotNone(res)
+            mock_reader.close.assert_called_once()
+            mock_stream.close.assert_called_once()
+
+        # Test error path also safely closes stream
+        mock_stream.reset_mock()
+        with patch("media_listener.wss.DataReader", side_effect=RuntimeError("COM error")):
+            res = asyncio.run(listener._read_thumbnail(mock_thumb_ref))
+            self.assertIsNone(res)
+            mock_stream.close.assert_called_once()
+
+    def test_webview_visibility_and_run_js(self):
+        from ui_webview import WebviewDashboard
+        from config import Config
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "cfg.json")
+            dash = WebviewDashboard(cfg, MagicMock(), lambda: None)
+            mock_window = MagicMock()
+            dash.window = mock_window
+
+            # Window hidden: should NOT push to webview
+            dash.is_visible = False
+            from media_listener import TrackInfo
+            track = TrackInfo(is_playing=True, title="Test Song", artist="Artist", thumbnail_bytes=b"123")
+            dash.update_media(track)
+            mock_window.run_js.assert_not_called()
+            mock_window.evaluate_js.assert_not_called()
+
+            # Window visible: should call run_js
+            dash.is_visible = True
+            dash.update_media(track)
+            mock_window.run_js.assert_called_once()
+            mock_window.evaluate_js.assert_not_called()
+
+    def test_tray_state_caching(self):
+        from tray import TrayApp
+        from config import Config
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "cfg.json")
+            tray = TrayApp(cfg, lambda: None, lambda x: None, lambda: None)
+            tray.icon = MagicMock()
+
+            # First update sets state
+            tray.update_state(is_playing=True, is_paused=False, track_summary="Song - Artist")
+            first_key = tray._last_rendered_state
+            self.assertIsNotNone(first_key)
+            self.assertEqual(tray.icon.title, "Tuneshine: Song - Artist"[:64])
+
+            # Duplicate call with identical parameters should skip redraw
+            tray.icon.title = "Unchanged"
+            tray.update_state(is_playing=True, is_paused=False, track_summary="Song - Artist")
+            self.assertEqual(tray.icon.title, "Unchanged")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 

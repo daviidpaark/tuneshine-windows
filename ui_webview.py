@@ -170,8 +170,10 @@ class WebviewDashboard:
         self.on_config_changed = on_config_changed
         self.api = WebViewApi(config, hub_client, on_config_changed)
         self.window: Optional[webview.Window] = None
+        self.is_visible: bool = False
 
     def create_window(self, hidden: bool = False):
+        self.is_visible = not hidden
         self.window = webview.create_window(
             title="Tuneshine Windows",
             html=HTML_TEMPLATE,
@@ -186,17 +188,26 @@ class WebviewDashboard:
 
     def _on_closing(self):
         # Hide window instead of terminating application
+        self.is_visible = False
         if self.window:
             self.window.hide()
             return False
 
     def show(self):
+        self.is_visible = True
         if self.window:
             self.window.show()
             self.window.restore()
+            self.update_detected_apps()
+            if self.api.latest_track_dict:
+                try:
+                    js_code = f"if (window.updateTrackInfo) {{ window.updateTrackInfo({json.dumps(self.api.latest_track_dict)}); }}"
+                    self.window.run_js(js_code)
+                except Exception as e:
+                    logger.debug(f"Could not push to webview on show: {e}")
 
     def update_detected_apps(self):
-        if self.window:
+        if self.window and self.is_visible:
             try:
                 data = {
                     "detected_apps": self.config.detected_apps,
@@ -208,7 +219,7 @@ class WebviewDashboard:
                     "ignored_apps": self.config.ignored_apps,
                 }
                 js_code = f"if (window.updateDetectedApps) {{ window.updateDetectedApps({json.dumps(data)}); }}"
-                self.window.evaluate_js(js_code)
+                self.window.run_js(js_code)
             except Exception as e:
                 logger.debug(f"Could not push detected apps to webview: {e}")
 
@@ -229,9 +240,9 @@ class WebviewDashboard:
         }
         self.api.latest_track_dict = track_dict
 
-        if self.window:
+        if self.window and self.is_visible:
             try:
                 js_code = f"if (window.updateTrackInfo) {{ window.updateTrackInfo({json.dumps(track_dict)}); }}"
-                self.window.evaluate_js(js_code)
+                self.window.run_js(js_code)
             except Exception as e:
                 logger.debug(f"Could not push to webview: {e}")
