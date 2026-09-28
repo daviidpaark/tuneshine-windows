@@ -5,6 +5,11 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2026-09-28
+
+### Fixed
+- **Hub Session Recovery:** When the Hub answers a heartbeat with `ignored` (for example after a Hub restart or watchdog timeout), the companion resets its sent state and pushes the current track again instead of leaving the display blank until the next track change.
+
 ## [0.3.7] - 2026-09-11
 
 ### Fixed

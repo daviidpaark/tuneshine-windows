@@ -169,6 +169,9 @@ class TuneshineWindowsApp:
                     and self.hub_client.is_currently_playing
                 ):
                     await self.hub_client.send_heartbeat()
+                    if not self.hub_client.is_currently_playing:
+                        self.listener.invalidate_state()
+                        await self.listener.check_current_media(trigger="heartbeat_ignored")
 
         async def _main():
             await self.listener.start()

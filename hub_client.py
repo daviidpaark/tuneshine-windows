@@ -146,12 +146,17 @@ class HubClient:
         try:
             resp = await self.client.post(f"{self.hub_url}/heartbeat", timeout=5.0)
             if resp.status_code == 200:
+                if resp.json().get("status") == "ignored":
+                    logger.info("Hub has no active session for this client; will resend current track")
+                    self.is_currently_playing = False
+                    self.last_sent_hash = None
+                    return False
                 logger.debug("Successfully sent heartbeat to Hub")
                 return True
             else:
                 logger.warning(f"Hub responded to heartbeat with {resp.status_code}: {resp.text}")
                 return False
-        except httpx.RequestError as e:
+        except (httpx.RequestError, ValueError) as e:
             logger.debug(f"Failed to send heartbeat to Hub ({self.hub_url}): {e}")
             return False
 

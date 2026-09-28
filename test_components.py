@@ -188,6 +188,29 @@ class TestTuneshineWindows(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_heartbeat_ignored_resets_playing_state(self):
+        async def run_test():
+            client = HubClient("http://fake-hub:8585")
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"status": "ignored", "active_source": None}
+            client.client.post = AsyncMock(return_value=mock_response)
+
+            await client.send_playing(b"fake-png-bytes", "Title", "Artist", "Album")
+            self.assertTrue(client.is_currently_playing)
+
+            self.assertFalse(await client.send_heartbeat())
+            self.assertFalse(client.is_currently_playing)
+            self.assertIsNone(client.last_sent_hash)
+
+            # Same track is pushed again instead of being deduplicated
+            await client.send_playing(b"fake-png-bytes", "Title", "Artist", "Album")
+            self.assertEqual(client.client.post.call_count, 3)
+
+            await client.close()
+
+        asyncio.run(run_test())
+
     def test_send_stopped_sync(self):
         client = HubClient("http://192.168.1.100:8585", mode="hub")
         client.is_currently_playing = True
