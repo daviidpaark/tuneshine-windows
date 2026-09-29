@@ -16,7 +16,7 @@ Hooks directly into Windows 10/11's native **System Media Transport Controls (SM
 
 - **[tuneshine-windows](https://github.com/daviidpaark/tuneshine-windows)** *(This repository)*: Standalone Windows System Tray desktop companion. Hooks into Windows Media Controls (SMTC) to capture and stream real-time playback from Spotify, Apple Music, YouTube, Tidal, and local players to Tuneshine Hub (or directly to a physical Tuneshine device).
 - **[tuneshine-hub](https://github.com/daviidpaark/tuneshine-hub)**: Central Docker hub service. Manages 24/7 background Spotify tracking, converts raw artwork to 64×64 WebP, arbitrates multi-source priority, and drives your physical Tuneshine device.
-- **[tuneshine-navidrome](https://github.com/daviidpaark/tuneshine-navidrome)**: Official Navidrome plugin. Streams live playback and cover art from your Navidrome music server to Tuneshine Hub (or directly to a physical Tuneshine device).
+- **[tuneshine-navidrome](https://github.com/daviidpaark/tuneshine-navidrome)**: Navidrome plugin. Streams live playback and cover art from your Navidrome music server to Tuneshine Hub (or directly to a physical Tuneshine device).
 
 ---
 
@@ -51,7 +51,7 @@ Works out-of-the-box with any application that integrates with Windows Media Con
   - One-click Target Host & Operation Mode configuration.
   - Sync pause / resume toggle.
   - Launch on Windows Startup toggle (runs silently on boot).
-- **Ultra-Lightweight:** Uses `<25 MB` RAM and `0.0%` idle CPU.
+- **Lightweight:** Event-driven with near-zero idle CPU; runs quietly in the system tray.
 
 ---
 
@@ -59,7 +59,7 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 | Mode | Target | Description |
 | :--- | :--- | :--- |
-| **`Tuneshine Hub`** *(Recommended)* | Tuneshine Hub (e.g. `http://unraid:8585` or `<hub-ip>:8585`) | Forwards raw cover art and playback events to Hub for centralized arbitration and multi-device coordination. |
+| **`Tuneshine Hub`** *(Recommended)* | Tuneshine Hub (e.g. `http://<hub-ip>:8585`) | Forwards raw cover art and playback events to Hub for centralized arbitration and multi-device coordination. |
 | **`Direct to Device`** | Physical Tuneshine device (e.g. `http://192.168.1.100` or `http://tuneshine.local`) | Converts cover art to 64x64 lossless WebP locally with Pillow and uploads it directly to the device. |
 
 ---
@@ -68,12 +68,14 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 ### Option A: Standalone Executable (Recommended - No Python Required)
 
-1. Download the latest `TuneshineWindows.exe` and `Install.bat` from the [Releases](https://github.com/daviidpaark/tuneshine-windows/releases) page.
+1. Download `TuneshineWindows.exe`, `Install.bat`, and `installer.ps1` from the [latest release](https://github.com/daviidpaark/tuneshine-windows/releases/latest) into the same folder.
 2. Double-click **`Install.bat`**. This will:
    - Copy the executable to `%LOCALAPPDATA%\TuneshineWindows\`
    - Create Start Menu & Desktop shortcuts
    - Enable automatic Windows startup
    - Launch the application immediately
+
+To remove it, download `Uninstall.bat` and `uninstall.ps1` from the same release and run `Uninstall.bat`.
 
 ### Option B: Running from Source
 
@@ -130,7 +132,7 @@ Double-click the square **Tuneshine** icon in your Windows System Tray (or right
 
 ### Configuration File (`config.json`)
 
-Settings are saved automatically to `config.json` (located in `%APPDATA%\tuneshine-windows\config.json` or local application directory):
+Settings are saved automatically to `%APPDATA%\tuneshine-windows\config.json`. If a `config.json` already exists next to the executable, that file is used instead (portable mode). `filter_mode` is `off`, `blacklist` (Block Mode), or `whitelist` (Allow Mode):
 
 ```json
 {
@@ -144,7 +146,8 @@ Settings are saved automatically to `config.json` (located in `%APPDATA%\tuneshi
   "filter_mode": "off",
   "blacklist": [],
   "whitelist": [],
-  "detected_apps": {}
+  "detected_apps": {},
+  "ignored_apps": []
 }
 ```
 
