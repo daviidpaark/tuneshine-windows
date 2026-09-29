@@ -1,6 +1,7 @@
 # Tuneshine Windows Desktop Companion
 
 [![CI](https://github.com/daviidpaark/tuneshine-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/daviidpaark/tuneshine-windows/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/daviidpaark/tuneshine-windows)](https://github.com/daviidpaark/tuneshine-windows/releases/latest)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%20%7C%203.13%20%7C%203.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -173,7 +174,7 @@ Run unit tests with:
 ## AI Disclosure & Personal Project Note
 
 > [!NOTE]
-> This project was developed as a personal home lab tool with the assistance of **Google Antigravity (Gemini Flash)** AI pair programming. It is shared publicly for the benefit of the community and other Tuneshine owners. Contributions, feedback, and issue reports are always welcome!
+> This project was developed as a personal home lab tool with the assistance of **Google Antigravity (Gemini Flash)** and **Claude Code (Claude Opus)** AI pair programming. It is shared publicly for the benefit of the community and other Tuneshine owners. Contributions, feedback, and issue reports are always welcome!
 
 ---
 

@@ -3,7 +3,7 @@ name: Release Build
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       tag:
@@ -13,16 +13,33 @@ on:
 
 jobs:
   build-release:
-    name: Build & Publish Executable
+    name: Test, Build & Publish Executable
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ env.TAG }}
+
+      - name: Verify tag matches APP_VERSION and CHANGELOG
+        run: |
+          version=$(sed -nE 's/^APP_VERSION = "([^"]+)".*/\1/p' config.py)
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match APP_VERSION $version"
+            exit 1
+          fi
+          if ! grep -qF "## [$version]" CHANGELOG.md; then
+            echo "::error::No CHANGELOG.md section for $version"
+            exit 1
+          fi
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v7
@@ -35,15 +52,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
+      - name: Run unit tests
+        run: python -m unittest discover -s . -p "test_*.py" -v
+
       - name: Build Standalone Executable
+        run: python build_exe.py
+
+      - name: Prepare release title and notes
+        id: notes
         run: |
-          python build_exe.py
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          title=$(git tag -l --format='%(contents:subject)' "$TAG" | sed -nE 's/^Release (v[^:]+): (.)/\1 - \u\2/p')
+          echo "title=${title:-$TAG}" >> "$GITHUB_OUTPUT"
+          awk -v v="## [${TAG#v}]" 'index($0, v) == 1 {f = 1; next} f && /^## \[/ {exit} f && !/^---\r?$/' CHANGELOG.md > release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          tag_name: ${{ env.TAG }}
+          name: ${{ steps.notes.outputs.title }}
+          body_path: release-notes.md
           files: |
             dist/TuneshineWindows.exe
             Install.bat
