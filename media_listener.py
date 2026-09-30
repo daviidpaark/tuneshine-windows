@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Optional, Callable, Awaitable, List
 import winrt.windows.media.control as wmc
@@ -67,6 +68,10 @@ class MediaListener:
         self._pending_check_task: Optional[asyncio.Task] = None
         self._next_trigger: Optional[str] = None
         self._rerun_needed: bool = False
+        # App ids whose media-properties changed since the last check ("*" when the sender is unknown);
+        # players such as Spotify update the title before the artwork
+        self._props_dirty_apps: set = set()
+        self._props_dirty_lock = threading.Lock()  # WinRT events arrive on another thread
 
     async def _init_manager(self):
         try:
@@ -232,6 +237,12 @@ class MediaListener:
 
     def _on_media_properties_changed(self, sender, args):
         """WinRT event handler for title/artist/album/art changes."""
+        try:
+            app_id = sender.source_app_user_model_id if sender is not None else ""
+        except Exception:
+            app_id = ""
+        with self._props_dirty_lock:
+            self._props_dirty_apps.add(app_id or "*")
         self._schedule_check("props_changed")
 
     def _on_playback_info_changed(self, sender, args):
@@ -426,12 +437,21 @@ class MediaListener:
                     logger.debug(f"Error retrieving media properties: {e}")
 
                 state_key = f"{'playing' if is_playing else 'paused'}:{app_id}:{artist}:{title}:{album}"
+                # Only the chosen session's own properties event forces a re-read; clearing the whole
+                # set keeps it bounded, and a later switch to another app changes state_key anyway
+                with self._props_dirty_lock:
+                    dirty_apps = self._props_dirty_apps
+                    self._props_dirty_apps = set()
+                props_dirty = app_id in dirty_apps or "*" in dirty_apps
 
                 thumbnail_bytes = None
                 if thumbnail_ref:
-                    # Fetch thumbnail if track changed or if previous thumbnail was missing
-                    if state_key != self._last_state_key or self.current_track.thumbnail_bytes is None:
+                    # Fetch thumbnail if track changed, previous thumbnail was missing, or the player
+                    # reported new properties (artwork can arrive after the title for the same track)
+                    if state_key != self._last_state_key or self.current_track.thumbnail_bytes is None or props_dirty:
                         thumbnail_bytes = await self._read_thumbnail(thumbnail_ref)
+                        if thumbnail_bytes is None and state_key == self._last_state_key:
+                            thumbnail_bytes = self.current_track.thumbnail_bytes
                     else:
                         thumbnail_bytes = self.current_track.thumbnail_bytes
 
@@ -449,10 +469,10 @@ class MediaListener:
                     thumbnail_bytes=thumbnail_bytes,
                 )
 
-                # Send update if state changed OR if thumbnail arrived asynchronously
+                # Send update if state changed OR if the thumbnail arrived or changed asynchronously
                 needs_update = (
                     state_key != self._last_state_key
-                    or (is_playing and thumbnail_bytes is not None and self.current_track.thumbnail_bytes is None)
+                    or (is_playing and thumbnail_bytes is not None and thumbnail_bytes != self.current_track.thumbnail_bytes)
                 )
 
                 if needs_update:

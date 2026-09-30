@@ -260,7 +260,7 @@ class TestTuneshineWindows(unittest.TestCase):
             res = client.send_stopped_sync()
             self.assertTrue(res)
             self.assertFalse(client.is_currently_playing)
-            mock_delete.assert_called_once_with("http://192.168.1.100:8585/image")
+            mock_delete.assert_called_once_with("http://192.168.1.100:8585/image", params={"source": "windows"})
 
         # When already stopped, returns True without HTTP call
         with patch("httpx.Client.delete") as mock_delete:
@@ -619,6 +619,119 @@ class TestTuneshineWindows(unittest.TestCase):
             asyncio.run(listener.check_current_media(trigger="art_stage2"))
             self.assertEqual(len(updates), 2)
             self.assertEqual(updates[-1].thumbnail_bytes, b"fake_jpeg_bytes")
+
+    def test_stale_artwork_replaced_after_properties_event(self):
+        import tempfile
+        from pathlib import Path
+        from media_listener import MediaListener, STATUS_PLAYING
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "stale_config.json")
+
+            updates = []
+            async def on_update(track):
+                updates.append(track)
+
+            listener = MediaListener(on_update=on_update, config=cfg)
+            listener._running = True
+
+            mock_s = MagicMock()
+            mock_s.source_app_user_model_id = "Spotify.exe"
+            mock_pb = MagicMock()
+            mock_pb.playback_status = STATUS_PLAYING
+            mock_s.get_playback_info.return_value = mock_pb
+            mock_props = MagicMock()
+            mock_props.title = "New Song"
+            mock_props.artist = "Artist"
+            mock_props.album_title = "New Album"
+            mock_props.thumbnail = MagicMock()
+            mock_s.try_get_media_properties_async = AsyncMock(return_value=mock_props)
+            mock_mgr = MagicMock()
+            mock_mgr.get_current_session.return_value = mock_s
+            mock_mgr.get_sessions.return_value = [mock_s]
+            listener.manager = mock_mgr
+
+            # Title switched first while the player still exposes the previous album's art
+            listener._read_thumbnail = AsyncMock(return_value=b"old_album_art")
+            asyncio.run(listener.check_current_media(trigger="props_changed"))
+            self.assertEqual(updates[-1].thumbnail_bytes, b"old_album_art")
+
+            # A poll without a properties event reuses the cached art
+            listener._read_thumbnail = AsyncMock(return_value=b"new_album_art")
+            asyncio.run(listener.check_current_media(trigger="loop"))
+            self.assertEqual(len(updates), 1)
+            listener._read_thumbnail.assert_not_called()
+
+            # The artwork update event re-reads the thumbnail and emits the new art
+            listener._on_media_properties_changed(None, None)
+            asyncio.run(listener.check_current_media(trigger="props_changed"))
+            self.assertEqual(len(updates), 2)
+            self.assertEqual(updates[-1].thumbnail_bytes, b"new_album_art")
+
+            # Re-reading identical art emits nothing
+            listener._on_media_properties_changed(None, None)
+            asyncio.run(listener.check_current_media(trigger="props_changed"))
+            self.assertEqual(len(updates), 2)
+
+            # A properties event from another app does not re-read Spotify's thumbnail
+            other = MagicMock()
+            other.source_app_user_model_id = "Chrome"
+            listener._read_thumbnail = AsyncMock(return_value=b"new_album_art")
+            listener._on_media_properties_changed(other, None)
+            asyncio.run(listener.check_current_media(trigger="props_changed"))
+            listener._read_thumbnail.assert_not_called()
+
+            # Spotify's own event does
+            listener._on_media_properties_changed(mock_s, None)
+            asyncio.run(listener.check_current_media(trigger="props_changed"))
+            listener._read_thumbnail.assert_awaited_once()
+
+    def test_hub_source_param_only_in_hub_mode(self):
+        self.assertEqual(HubClient("http://hub:8585", mode="hub")._hub_params, {"source": "windows"})
+        self.assertIsNone(HubClient("http://192.168.1.100", mode="direct")._hub_params)
+
+    def test_dashboard_encodes_artwork_lazily(self):
+        import tempfile
+        from pathlib import Path
+        from ui_webview import WebviewDashboard
+        from media_listener import TrackInfo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = Config(custom_path=Path(tmpdir) / "ui_config.json")
+            dashboard = WebviewDashboard(cfg, HubClient("http://hub:8585"), lambda: None)
+            track = TrackInfo(is_playing=True, title="Song", thumbnail_bytes=b"art")
+
+            with patch("ui_webview.base64.b64encode", wraps=__import__("base64").b64encode) as encode:
+                # Hidden dashboard: no encoding
+                dashboard.update_media(track)
+                encode.assert_not_called()
+
+                # Payload built on demand and cached for the same track
+                self.assertEqual(dashboard.api.latest_track_dict["art_b64"], "YXJ0")
+                self.assertEqual(dashboard.api.latest_track_dict["title"], "Song")
+                encode.assert_called_once()
+
+    def test_config_save_is_atomic(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "atomic_config.json"
+            cfg = Config(custom_path=path)
+            cfg.service_name = "Tidal"
+
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["service_name"], "Tidal")
+            self.assertFalse(path.with_name(path.name + ".tmp").exists())
+
+            # Defaults are copied, so one instance cannot mutate another's lists
+            cfg.data["ignored_apps"].append("x.exe")
+            self.assertNotIn("x.exe", DEFAULT_CONFIG["ignored_apps"])
+
+            # A failed swap keeps the old file and removes the temp file
+            with patch("config.os.replace", side_effect=PermissionError("locked")), patch("config.time.sleep"):
+                cfg.service_name = "Apple Music"
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["service_name"], "Tidal")
+            self.assertFalse(path.with_name(path.name + ".tmp").exists())
 
     def test_ignored_apps_removal_and_restoration(self):
         import tempfile

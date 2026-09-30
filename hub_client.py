@@ -9,6 +9,8 @@ from PIL import Image, ImageOps
 
 logger = logging.getLogger("tuneshine-windows.client")
 
+HUB_SOURCE = "windows"
+
 
 def convert_to_tuneshine_webp(raw_image_bytes: bytes) -> bytes:
     """Center-crops any input image to a 64x64 lossless WebP for physical Tuneshine hardware."""
@@ -45,6 +47,11 @@ class HubClient:
 
     async def close(self):
         await self.client.aclose()
+
+    @property
+    def _hub_params(self) -> Optional[Dict[str, str]]:
+        """Identifies this client to Tuneshine Hub so it gets its own playback slot; the device gets no parameters."""
+        return {"source": HUB_SOURCE} if self.mode == "hub" else None
 
     @staticmethod
     def _compute_hash(image_bytes: bytes, metadata: Dict[str, Any]) -> str:
@@ -99,7 +106,7 @@ class HubClient:
             if self.mode == "direct":
                 resp = await self.client.post(url, files=files)
             else:
-                resp = await self.client.post(url, files=files, data=data)
+                resp = await self.client.post(url, files=files, data=data, params=self._hub_params)
 
             if 200 <= resp.status_code < 300:
                 self.last_sent_hash = payload_hash
@@ -123,7 +130,7 @@ class HubClient:
             return True
 
         try:
-            resp = await self.client.delete(f"{self.hub_url}/image")
+            resp = await self.client.delete(f"{self.hub_url}/image", params=self._hub_params)
             if resp.status_code == 200:
                 self.is_currently_playing = False
                 self.last_sent_hash = None
@@ -145,7 +152,7 @@ class HubClient:
             return True
 
         try:
-            resp = await self.client.post(f"{self.hub_url}/heartbeat", timeout=5.0)
+            resp = await self.client.post(f"{self.hub_url}/heartbeat", params=self._hub_params, timeout=5.0)
             if resp.status_code == 200:
                 if resp.json().get("status") == "ignored":
                     logger.info("Hub has no active session for this client; will resend current track")
@@ -168,7 +175,7 @@ class HubClient:
 
         try:
             with httpx.Client(timeout=2.0) as client:
-                resp = client.delete(f"{self.hub_url}/image")
+                resp = client.delete(f"{self.hub_url}/image", params=self._hub_params)
                 if 200 <= resp.status_code < 300:
                     self.is_currently_playing = False
                     self.last_sent_hash = None

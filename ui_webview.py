@@ -33,7 +33,32 @@ class WebViewApi:
         self.config = config
         self.hub_client = hub_client
         self.on_config_changed = on_config_changed
-        self.latest_track_dict = {}
+        self.latest_track: Optional[TrackInfo] = None
+        self._track_dict_cache: tuple = (None, {})
+
+    @property
+    def latest_track_dict(self) -> dict:
+        """Dashboard payload for the latest track, base64-encoding artwork only when requested."""
+        track = self.latest_track
+        if track is None:
+            return {}
+        cached_track, cached_dict = self._track_dict_cache
+        if cached_track is track:
+            return cached_dict
+
+        art_b64 = base64.b64encode(track.thumbnail_bytes).decode("utf-8") if track.thumbnail_bytes else ""
+        track_dict = {
+            "is_playing": track.is_playing,
+            "is_blocked": getattr(track, "is_blocked", False),
+            "title": track.title,
+            "artist": track.artist,
+            "album": track.album,
+            "app_id": track.app_id,
+            "app_name": getattr(track, "app_name", "") or track.app_id,
+            "art_b64": art_b64,
+        }
+        self._track_dict_cache = (track, track_dict)
+        return track_dict
 
     def get_initial_state(self):
         return {
@@ -224,25 +249,12 @@ class WebviewDashboard:
                 logger.debug(f"Could not push detected apps to webview: {e}")
 
     def update_media(self, track: TrackInfo):
-        art_b64 = ""
-        if track.thumbnail_bytes:
-            art_b64 = base64.b64encode(track.thumbnail_bytes).decode("utf-8")
-
-        track_dict = {
-            "is_playing": track.is_playing,
-            "is_blocked": getattr(track, "is_blocked", False),
-            "title": track.title,
-            "artist": track.artist,
-            "album": track.album,
-            "app_id": track.app_id,
-            "app_name": getattr(track, "app_name", "") or track.app_id,
-            "art_b64": art_b64,
-        }
-        self.api.latest_track_dict = track_dict
+        # Keep the raw track; artwork is base64-encoded only when the dashboard is visible or opened
+        self.api.latest_track = track
 
         if self.window and self.is_visible:
             try:
-                js_code = f"if (window.updateTrackInfo) {{ window.updateTrackInfo({json.dumps(track_dict)}); }}"
+                js_code = f"if (window.updateTrackInfo) {{ window.updateTrackInfo({json.dumps(self.api.latest_track_dict)}); }}"
                 self.window.run_js(js_code)
             except Exception as e:
                 logger.debug(f"Could not push to webview: {e}")

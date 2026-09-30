@@ -1,7 +1,9 @@
+import copy
 import json
 import logging
 import os
 import sys
+import time
 import winreg
 from pathlib import Path
 from typing import Any, Dict
@@ -9,7 +11,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.9"
+APP_VERSION = "0.3.10"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -241,7 +243,7 @@ def match_app_names(rule: str, target: str) -> bool:
 class Config:
     def __init__(self, custom_path: Path = None):
         self.config_path = custom_path or get_config_path()
-        self.data: Dict[str, Any] = DEFAULT_CONFIG.copy()
+        self.data: Dict[str, Any] = copy.deepcopy(DEFAULT_CONFIG)
         self.load()
 
     def load(self):
@@ -257,13 +259,25 @@ class Config:
             self.save()
 
     def save(self):
+        # Write to a temp file and swap it in, so a crash mid-write cannot corrupt the config
+        tmp_path = self.config_path.with_name(self.config_path.name + ".tmp")
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_path, "w", encoding="utf-8") as f:
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=2)
+            try:
+                os.replace(tmp_path, self.config_path)
+            except PermissionError:
+                # Antivirus or an editor can hold the file briefly on Windows; retry once
+                time.sleep(0.1)
+                os.replace(tmp_path, self.config_path)
             logger.info(f"Saved configuration to {self.config_path}")
         except Exception as e:
             logger.error(f"Error saving config file: {e}")
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     @property
     def hub_url(self) -> str:

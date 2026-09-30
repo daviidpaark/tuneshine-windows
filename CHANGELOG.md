@@ -5,6 +5,15 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10] - 2026-09-30
+
+### Fixed
+- **Stale Artwork:** Players such as Spotify update the title before the artwork, and the thumbnail was only read when the title, artist, or album changed, so a new track could keep the previous album's cover. A media-properties event from the playing app now re-reads the thumbnail and pushes it when the artwork changed; events from other apps are ignored.
+- **Hub Client Slot:** Hub mode requests (`POST`/`DELETE /image`, `/heartbeat`) now send `?source=windows`, so Tuneshine Hub 0.2.7+ tracks the companion in its own slot and another client stopping no longer clears the PC's display. Direct mode requests are unchanged.
+- **Hidden Dashboard Work:** Artwork is no longer base64-encoded for the dashboard while it is hidden in the tray; it is encoded when the dashboard is shown.
+- **Config Corruption:** Settings are written to a temporary file and swapped in, so a crash mid-save can no longer corrupt `config.json` and reset app filters. If the swap fails (for example the file is briefly locked), it is retried once and the temporary file is removed. Default lists are also deep-copied per instance.
+- **Pinned Dependencies:** CI and release builds now install with `requirements-lock.txt` as constraints, so the released executable is built from the tested versions.
+
 ## [0.3.9] - 2026-09-30
 
 ### Added
