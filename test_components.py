@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -119,6 +120,43 @@ class TestTuneshineWindows(unittest.TestCase):
         with Image.open(io.BytesIO(webp_bytes)) as out_img:
             self.assertEqual(out_img.size, (64, 64))
             self.assertEqual(out_img.format, "WEBP")
+
+    def test_direct_mode_webp_center_crops_non_square(self):
+        from hub_client import convert_to_tuneshine_webp
+        from PIL import Image
+        import io
+        # 128x64: red 32px side bands around a green 64x64 center
+        img = Image.new("RGB", (128, 64), (255, 0, 0))
+        img.paste((0, 255, 0), (32, 0, 96, 64))
+        png_buf = io.BytesIO()
+        img.save(png_buf, format="PNG")
+
+        with Image.open(io.BytesIO(convert_to_tuneshine_webp(png_buf.getvalue()))) as out_img:
+            self.assertEqual(out_img.size, (64, 64))
+            self.assertEqual(out_img.getpixel((0, 32))[:3], (0, 255, 0))
+            self.assertEqual(out_img.getpixel((63, 32))[:3], (0, 255, 0))
+
+    def test_send_playing_metadata_fields(self):
+        async def run_test():
+            client = HubClient("http://fake-hub:8585")
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            client.client.post = AsyncMock(return_value=mock_response)
+
+            await client.send_playing(b"fake-png-bytes", "Song Title", "Artist", "Album")
+            meta = json.loads(client.client.post.call_args.kwargs["data"]["metadata"])
+            self.assertEqual(meta["trackName"], "Song Title")
+            self.assertEqual(meta["albumName"], "Album")
+
+            # Missing album no longer falls back to the track title
+            await client.send_playing(b"fake-png-bytes", "Single", "Artist", "")
+            meta = json.loads(client.client.post.call_args.kwargs["data"]["metadata"])
+            self.assertEqual(meta["trackName"], "Single")
+            self.assertEqual(meta["albumName"], "Unknown Album")
+
+            await client.close()
+
+        asyncio.run(run_test())
 
     def test_track_info_summary(self):
         idle_track = TrackInfo(is_playing=False)

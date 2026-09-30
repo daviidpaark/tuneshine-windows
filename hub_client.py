@@ -5,20 +5,20 @@ import json
 import logging
 from typing import Optional, Dict, Any
 import httpx
-from PIL import Image
+from PIL import Image, ImageOps
 
 logger = logging.getLogger("tuneshine-windows.client")
 
 
 def convert_to_tuneshine_webp(raw_image_bytes: bytes) -> bytes:
-    """Converts any input image to 64x64 lossless WebP for physical Tuneshine hardware."""
+    """Center-crops any input image to a 64x64 lossless WebP for physical Tuneshine hardware."""
     with Image.open(io.BytesIO(raw_image_bytes)) as img:
         if img.mode != "RGBA":
             converted = img.convert("RGBA")
         else:
             converted = img
         try:
-            with converted.resize((64, 64), Image.Resampling.LANCZOS) as resized:
+            with ImageOps.fit(converted, (64, 64), method=Image.Resampling.LANCZOS) as resized:
                 out = io.BytesIO()
                 resized.save(out, format="WEBP", lossless=True)
                 return out.getvalue()
@@ -69,8 +69,9 @@ class HubClient:
             return False
 
         metadata = {
+            "trackName": title,
             "artistName": artist or "Unknown Artist",
-            "albumName": album or title or "Unknown Album",
+            "albumName": album or "Unknown Album",
             "serviceName": service_name,
             "itemId": item_id or f"{artist}-{title}",
             "heartbeat": bool(self.mode == "hub"),

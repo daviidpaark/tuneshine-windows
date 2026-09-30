@@ -36,7 +36,7 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 
 - **Two Operation Modes:**
   - **Tuneshine Hub:** Forwards raw cover art and metadata to a `tuneshine-hub` container for image processing and multi-source coordination.
-  - **Direct to Device:** Converts cover art to 64x64 lossless WebP locally via Pillow and sends it directly to a physical Tuneshine device without requiring Docker.
+  - **Direct to Device:** Center-crops cover art to 64x64 lossless WebP locally via Pillow and sends it directly to a physical Tuneshine device without requiring Docker.
 - **Streamlined Program Filtering (Allow & Block):**
   - **Off (Allow All):** Every media player is permitted to sync (default).
   - **Block Mode:** Block specific applications (e.g. Chrome, Edge, Discord, games) to prevent unwanted video/audio clips from hijacking your display.

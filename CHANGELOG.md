@@ -5,6 +5,15 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-09-30
+
+### Added
+- **Track Names:** Pushes now include `trackName`, so the Hub and device report the current song title.
+
+### Fixed
+- **Album Fallback:** A missing album falls back to `Unknown Album` instead of the track title.
+- **Non-Square Artwork:** Direct mode center-crops artwork to a square before resizing instead of stretching it.
+
 ## [0.3.8] - 2026-09-28
 
 ### Fixed
