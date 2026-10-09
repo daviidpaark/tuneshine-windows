@@ -5,6 +5,14 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11] - 2026-10-09
+
+### Changed
+- **App Icon:** The tray, executable, and shortcut icon is now the [Lucide](https://lucide.dev) `square-play` icon (ISC), shipped as `icon.svg` and tinted per playback state, replacing the square outline that was drawn in code.
+
+### Fixed
+- **Blurry Executable Icon:** `icon.ico` only contained the 16px frame; it now includes every size from 16px to 256px.
+
 ## [0.3.10] - 2026-09-30
 
 ### Fixed

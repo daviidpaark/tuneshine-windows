@@ -34,6 +34,7 @@ def build():
         "--hidden-import", "clr_loader",
         "--collect-all", "webview",
         "--add-data", f"{root / 'dashboard.html'};.",
+        "--add-data", f"{root / 'icon.png'};.",
         "--clean",
         "--noconfirm",
         str(main_py),

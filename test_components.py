@@ -180,6 +180,14 @@ class TestTuneshineWindows(unittest.TestCase):
         img_paused = generate_square_icon(is_playing=False, is_paused=True)
         self.assertEqual(img_paused.size, (64, 64))
 
+        # Same Lucide glyph in every state, tinted per state
+        self.assertEqual(img_idle.getchannel("A").tobytes(), img_playing.getchannel("A").tobytes())
+        self.assertEqual(img_playing.getpixel((32, 8))[:3], (34, 197, 94))
+        self.assertEqual(img_paused.getpixel((32, 8))[:3], (245, 158, 11))
+        self.assertEqual(img_idle.getpixel((32, 8))[:3], (212, 212, 216))
+        self.assertGreater(img_idle.getpixel((32, 8))[3], 200)
+        self.assertEqual(img_idle.getpixel((0, 0))[3], 0)
+
     def test_hub_client_hash_deduplication(self):
         async def run_test():
             client = HubClient("http://fake-hub:8585")

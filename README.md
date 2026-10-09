@@ -47,7 +47,7 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 - **Instant Event-Driven Sync:** Pushes updates the moment a track starts, changes, or pauses (similar to Discord Music Presence engines).
 - **Artwork Hash Deduplication:** Eliminates redundant network calls for identical tracks or consecutive plays.
 - **Clean System Tray Interface:**
-  - Minimalist thin-border square icon dynamically reflecting playback state (Emerald Green = Playing, Amber = Paused, Silver = Idle).
+  - Square play icon ([Lucide](https://lucide.dev) `square-play`, ISC) dynamically reflecting playback state (Emerald Green = Playing, Amber = Paused, Silver = Idle).
   - One-click Target Host & Operation Mode configuration.
   - Sync pause / resume toggle.
   - Launch on Windows Startup toggle (runs silently on boot).
