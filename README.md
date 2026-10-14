@@ -48,9 +48,9 @@ Works out-of-the-box with any application that integrates with Windows Media Con
 - **Artwork Hash Deduplication:** Eliminates redundant network calls for identical tracks or consecutive plays.
 - **Clean System Tray Interface:**
   - Square play icon ([Lucide](https://lucide.dev) `square-play`, ISC) dynamically reflecting playback state (Emerald Green = Playing, Amber = Paused, Silver = Idle).
-  - One-click Target Host & Operation Mode configuration.
+  - Live status and current track at a glance.
   - Sync pause / resume toggle.
-  - Launch on Windows Startup toggle (runs silently on boot).
+  - Double-click to open the dashboard for Target Address, Operation Mode, filtering, and startup settings.
 - **Lightweight:** Event-driven with near-zero idle CPU; runs quietly in the system tray.
 
 ---
@@ -109,12 +109,14 @@ To remove it, download `Uninstall.bat` and `uninstall.ps1` from the same release
 
 Double-click the square **Tuneshine** icon in your Windows System Tray (or right-click and select **Open Dashboard**) to manage all settings:
 
-- **Target Host / URL** — Set the address of your Hub (e.g. `http://localhost:8585` or `http://192.168.1.50:8585`) or physical Tuneshine.
+- **Target Address** — Set the address of your Hub (e.g. `http://localhost:8585` or `http://192.168.1.50:8585`) or physical Tuneshine. **Ping** tests the connection.
 - **Operation Mode** — Switch between `Tuneshine Hub` and `Direct to Device`.
-- **Program Filtering** — Select `Off (Allow All)`, `Block Mode` (blacklist), or `Allow Mode` (whitelist) to control which apps are allowed to push artwork.
+- **Program Filtering** — Select `Off (Allow All)`, `Block Mode`, or `Allow Mode` to control which apps are allowed to push artwork. Detected programs are listed automatically, and **Add exe** registers one by hand (e.g. `cider.exe`).
+- **Hidden Programs** — Removing a detected program hides it and stops it from syncing. The collapsed **Hidden** list restores it.
+- **Sync Playback** — Pause or resume display updates.
 - **Start Minimized to Tray** — Launch quietly in the system tray without popping up the dashboard window.
-- **Launch on Windows Startup** — Enable or disable automatic background start on Windows login.
-- **Clear Delay & Service Name** — Customize debounce duration and the service label displayed on hardware.
+- **Launch with Windows** — Enable or disable automatic background start on Windows login.
+- **Clear / Pause Delay** — Debounce duration before the display clears, in 0.5 second steps.
 
 ### Right-Click Tray Menu
 
@@ -132,7 +134,7 @@ Double-click the square **Tuneshine** icon in your Windows System Tray (or right
 
 ### Configuration File (`config.json`)
 
-Settings are saved automatically to `%APPDATA%\tuneshine-windows\config.json`. If a `config.json` already exists next to the executable, that file is used instead (portable mode). `filter_mode` is `off`, `blacklist` (Block Mode), or `whitelist` (Allow Mode):
+Settings are saved automatically to `%APPDATA%\tuneshine-windows\config.json`. If a `config.json` already exists next to the executable, that file is used instead (portable mode). `filter_mode` is `off`, `block` (uses the `blacklist` entries), or `allow` (uses the `whitelist` entries). `service_name`, the label shown on the display, is only set here:
 
 ```json
 {
