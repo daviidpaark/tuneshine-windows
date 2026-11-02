@@ -5,6 +5,14 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-11-02
+
+### Changed
+- **PyWinRT 4:** Upgraded `winrt-runtime` to 4.1.0 and the `winrt-Windows.*` projection packages to `4!10.0.28000.2957`. The executable build relies on the PyInstaller hook shipped with `winrt-runtime`, which bundles each namespace's `_table.pywinrt`, instead of listing `winrt.*` hidden imports in `build_exe.py`.
+
+### Fixed
+- **Unbounded Dependencies:** `requirements.txt` now caps every dependency below its next major version (`<5!0` for the epoch-versioned projection packages), so a plain install can no longer pull an untested major release such as PyWinRT 5.
+
 ## [0.3.11] - 2026-10-09
 
 ### Changed

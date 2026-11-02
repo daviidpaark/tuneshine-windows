@@ -22,8 +22,8 @@ pywin32-ctypes==0.2.3
 setuptools==84.0.0
 six==1.17.0
 typing_extensions==4.16.0
-winrt-runtime==3.2.1
-winrt-Windows.Foundation==3.2.1
-winrt-Windows.Foundation.Collections==3.2.1
-winrt-Windows.Media.Control==3.2.1
-winrt-Windows.Storage.Streams==3.2.1
+winrt-runtime==4.1.0
+winrt-Windows.Foundation==4!10.0.28000.2957
+winrt-Windows.Foundation.Collections==4!10.0.28000.2957
+winrt-Windows.Media.Control==4!10.0.28000.2957
+winrt-Windows.Storage.Streams==4!10.0.28000.2957
