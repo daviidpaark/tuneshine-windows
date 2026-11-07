@@ -12,7 +12,7 @@ packaging==26.3
 pefile==2024.8.26
 pillow==13.0.0
 proxy_tools==0.1.0
-pycparser==3.0
+pycparser==3.12
 pyinstaller==6.22.2
 pyinstaller-hooks-contrib==2026.7
 pystray==0.19.5
