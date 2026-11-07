@@ -19,7 +19,7 @@ pystray==0.19.5
 pythonnet==3.1.0
 pywebview==6.2.1
 pywin32-ctypes==0.2.3
-setuptools==84.1.0
+setuptools==84.2.1
 six==1.17.0
 typing_extensions==4.16.0
 winrt-runtime==4.1.0
