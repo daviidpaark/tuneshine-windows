@@ -5,6 +5,12 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13] - 2026-11-06
+
+### Security
+- **Dashboard App Buttons:** Program ids reported by other apps are passed to the Allow, Block, Remove and Restore buttons as data attributes instead of inline `onclick` code, so an id containing a quote can no longer run script in the dashboard (it also broke those buttons).
+- **Pillow 13:** Updated Pillow to 13.0.0, setuptools to 84.1.0 and certifi to 2026.10.18 for published security fixes.
+
 ## [0.3.12] - 2026-11-02
 
 ### Changed

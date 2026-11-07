@@ -857,9 +857,9 @@
               <div class="app-id-sub" title="${escapeHtml(appId)}">${escapeHtml(appId)}</div>
             </div>
             <div class="app-actions">
-              <button class="${allowBtnClass}" title="Mark as Allowed" onclick="setAppFilter('${escapeHtml(appId)}', '${nextAllowState}')">Allow</button>
-              <button class="${blockBtnClass}" title="Mark as Blocked" onclick="setAppFilter('${escapeHtml(appId)}', '${nextBlockState}')">Block</button>
-              <button class="btn-delete" title="Remove program completely" onclick="removeApp('${escapeHtml(appId)}')">✕</button>
+              <button class="${allowBtnClass}" title="Mark as Allowed" data-action="filter" data-app-id="${escapeHtml(appId)}" data-state="${nextAllowState}">Allow</button>
+              <button class="${blockBtnClass}" title="Mark as Blocked" data-action="filter" data-app-id="${escapeHtml(appId)}" data-state="${nextBlockState}">Block</button>
+              <button class="btn-delete" title="Remove program completely" data-action="remove" data-app-id="${escapeHtml(appId)}">✕</button>
             </div>
           </div>
         `;
@@ -880,7 +880,7 @@
         html += `
           <div class="ignored-item">
             <span class="app-name" style="font-size:11px; color:var(--text-muted);" title="${escapeHtml(appId)}">${escapeHtml(appId)}</span>
-            <button class="btn-restore" title="Restore this program" onclick="restoreApp('${escapeHtml(appId)}')">+ Restore</button>
+            <button class="btn-restore" title="Restore this program" data-action="restore" data-app-id="${escapeHtml(appId)}">+ Restore</button>
           </div>
         `;
       });
@@ -900,6 +900,18 @@
         }
       }
     }
+
+    // App ids come from other programs, so they are only ever passed as data attributes, never as code
+    function onAppAction(event) {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const appId = button.dataset.appId;
+      if (button.dataset.action === 'filter') setAppFilter(appId, button.dataset.state);
+      else if (button.dataset.action === 'remove') removeApp(appId);
+      else if (button.dataset.action === 'restore') restoreApp(appId);
+    }
+    document.getElementById('appsList').addEventListener('click', onAppAction);
+    document.getElementById('ignoredList').addEventListener('click', onAppAction);
 
     function escapeHtml(text) {
       if (!text) return '';
