@@ -5,6 +5,16 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] - 2026-11-09
+
+### Fixed
+- Stopping playback is recognised when the hub answers with any success status, not only `200`.
+- The background media check is kept as a task and cancelled when the app stops, so it can no longer be collected while running.
+
+### Changed
+- The hub address placeholder in the dashboard is a generic example address.
+- Updated certifi to 2026.10.23, pycparser to 3.12, setuptools to 84.2.1, anyio to 4.16.0 and pythonnet to 3.2.1 (checked by opening the dashboard's Edge WebView window).
+
 ## [0.3.14] - 2026-11-09
 
 ### Fixed

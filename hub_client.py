@@ -131,7 +131,7 @@ class HubClient:
 
         try:
             resp = await self.client.delete(f"{self.hub_url}/image", params=self._hub_params)
-            if resp.status_code == 200:
+            if 200 <= resp.status_code < 300:
                 self.is_currently_playing = False
                 self.last_sent_hash = None
                 self.last_error = None

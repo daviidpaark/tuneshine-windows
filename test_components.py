@@ -224,6 +224,14 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertEqual(client.client.delete.call_count, 1)
             self.assertFalse(client.is_currently_playing)
 
+            # Any 2xx counts as stopped, not only 200
+            client.is_currently_playing = True
+            no_content = MagicMock()
+            no_content.status_code = 204
+            client.client.delete = AsyncMock(return_value=no_content)
+            self.assertTrue(await client.send_stopped())
+            self.assertFalse(client.is_currently_playing)
+
             # send_heartbeat while stopped should return True without network call
             client.client.post = AsyncMock()
             res_hb_idle = await client.send_heartbeat()
@@ -419,7 +427,7 @@ class TestTuneshineWindows(unittest.TestCase):
             cfg.set_app_filter_state("plezy.exe", "block")
             self.assertIn("plezy.exe", cfg.blocked_apps)
             res_save = api.save_settings({
-                "hub_url": "http://unraid:8585",
+                "hub_url": "http://192.168.1.100:8585",
                 "mode": "hub",
                 "enabled": True,
                 "start_in_tray": True,
@@ -904,6 +912,23 @@ class TestTuneshineWindows(unittest.TestCase):
             # Debouncing should coalesce rapid bursts into a single execution
             self.assertEqual(check_mock.call_count, 1)
             self.assertEqual(check_mock.call_args[1].get("trigger"), "playback_changed")
+
+    def test_sync_loop_task_is_kept_and_cancelled_on_stop(self):
+        from media_listener import MediaListener
+
+        async def run_test():
+            listener = MediaListener(on_update=AsyncMock())
+            with patch.object(listener, "_init_manager", AsyncMock()), \
+                 patch.object(listener, "check_current_media", AsyncMock()):
+                await listener.start()
+                task = listener._sync_task
+                self.assertIsNotNone(task)
+                self.assertFalse(task.done())
+                listener.stop()
+                await asyncio.sleep(0)
+                self.assertTrue(task.cancelled() or task.done())
+
+        asyncio.run(run_test())
 
     def test_thumbnail_stream_disposal(self):
         from media_listener import MediaListener

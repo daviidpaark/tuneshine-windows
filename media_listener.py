@@ -66,6 +66,7 @@ class MediaListener:
         self.current_track: TrackInfo = TrackInfo(is_playing=False)
         self._check_lock: Optional[asyncio.Lock] = None
         self._pending_check_task: Optional[asyncio.Task] = None
+        self._sync_task: Optional[asyncio.Task] = None
         self._next_trigger: Optional[str] = None
         self._rerun_needed: bool = False
         # App ids whose media-properties changed since the last check ("*" when the sender is unknown);
@@ -125,11 +126,13 @@ class MediaListener:
         self._check_lock = asyncio.Lock()
         await self._init_manager()
 
-        # Start the background sync loop (handles active polling & event fallbacks)
-        asyncio.create_task(self._sync_loop())
+        # Start the background sync loop (handles active polling & event fallbacks); the task is kept so it is not collected
+        self._sync_task = asyncio.create_task(self._sync_loop())
 
     def stop(self):
         self._running = False
+        if self._sync_task and not self._sync_task.done():
+            self._sync_task.cancel()
         if self._pending_check_task and not self._pending_check_task.done():
             self._pending_check_task.cancel()
         self._cleanup_all_session_events()
