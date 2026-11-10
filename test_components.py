@@ -493,6 +493,17 @@ class TestTuneshineWindows(unittest.TestCase):
             self.assertFalse(match_app_names("slack-desktop.exe", "com.deezer.deezer-desktop"))
             self.assertTrue(match_app_names("deezer", "com.deezer.deezer-desktop"))
             self.assertTrue(match_app_names("com.deezer.deezer-desktop", "com.deezer.deezer-desktop"))
+        # Apps that only share a name fragment, a publisher prefix or a publisher hash are different apps
+        self.assertFalse(match_app_names("plex.exe", "plexamp.exe"))
+        self.assertFalse(match_app_names(
+            "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic",
+            "Microsoft.ZuneVideo_8wekyb3d8bbwe!Microsoft.ZuneVideo",
+        ))
+        self.assertFalse(match_app_names(
+            "AppleInc.AppleMusicWin_nzyj5cx40ttqa!App",
+            "AppleInc.AppleTVWin_nzyj5cx40ttqa!App",
+        ))
+        self.assertTrue(match_app_names("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify", "Spotify.exe"))
 
     def test_listener_session_priority_and_selection(self):
         import tempfile

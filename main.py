@@ -31,6 +31,8 @@ CTRL_CLOSE_EVENT = 2
 CTRL_LOGOFF_EVENT = 5
 CTRL_SHUTDOWN_EVENT = 6
 
+PUSH_RETRY_SECONDS = 15.0
+
 
 class TuneshineWindowsApp:
     def __init__(self):
@@ -126,6 +128,9 @@ class TuneshineWindowsApp:
                 service_name=service_label,
                 item_id=f"{track.artist}-{track.title}",
             )
+            if not success and self._loop:
+                # The listener only reports changes, so have it report this track again once the target may be back
+                self._loop.call_later(PUSH_RETRY_SECONDS, self.listener.invalidate_state)
 
             self.tray.update_state(
                 is_playing=True,

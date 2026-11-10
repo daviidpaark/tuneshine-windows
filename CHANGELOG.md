@@ -5,6 +5,13 @@ All notable changes to the `tuneshine-windows` desktop companion will be documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2026-11-09
+
+### Fixed
+- **App Filter Matching:** Blocking or removing one program no longer affects another that only shares part of its name, a publisher prefix or a publisher id. Blocking Plex left Plexamp blocked too, and the same happened with Media Player and Movies & TV, and with Apple Music and Apple TV.
+- **Missed Tracks:** A track whose upload failed (hub or device unreachable) is sent again every 15 seconds until it succeeds, instead of staying off the display until the next track.
+- **Failed Builds:** `build_exe.py` exits with PyInstaller's error code, the installer stops when the rebuild fails, and the release workflow fails when a release file is missing, so a release can no longer be published without the executable.
+
 ## [0.3.13] - 2026-11-06
 
 ### Security

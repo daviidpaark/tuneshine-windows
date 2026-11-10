@@ -11,7 +11,7 @@ from typing import Any, Dict
 logger = logging.getLogger("tuneshine-windows.config")
 
 APP_NAME = "TuneshineWindows"
-APP_VERSION = "0.3.13"
+APP_VERSION = "0.3.14"
 DEFAULT_CONFIG = {
     "hub_url": "http://localhost:8585",
     "mode": "hub",  # "hub" or "direct"
@@ -202,15 +202,17 @@ def normalize_app_tokens(name: str) -> set:
                 raw_tokens.add(p)
                 raw_tokens.add(p.replace(" ", ""))
     if "." in base:
-        for p in base.split("."):
+        # The first segment is a publisher or domain prefix ("Microsoft.", "com."), shared by unrelated apps
+        for p in base.split(".")[1:]:
             if p:
                 raw_tokens.add(p)
                 raw_tokens.add(p.replace(" ", ""))
-    return {t for t in raw_tokens if t and len(t) > 1 and t not in GENERIC_APP_TOKENS}
+    # A fragment that still spans the "!" of a packaged app id is its publisher hash, not the app's name
+    return {t for t in raw_tokens if t and len(t) > 1 and t not in GENERIC_APP_TOKENS and ("!" not in t or t == s)}
 
 
 def match_app_names(rule: str, target: str) -> bool:
-    """Matches an app rule against a target app name or ID using exact stem, token intersection, and substrings."""
+    """Matches an app rule against a target app name or ID using exact stem and token intersection."""
     if not rule or not target:
         return False
     r_clean = rule.strip().lower()
@@ -230,14 +232,7 @@ def match_app_names(rule: str, target: str) -> bool:
 
     r_set = normalize_app_tokens(rule)
     t_set = normalize_app_tokens(target)
-    if r_set.intersection(t_set):
-        return True
-    for r in r_set:
-        if len(r) >= 4 and r not in GENERIC_APP_TOKENS:
-            for t in t_set:
-                if len(t) >= 4 and t not in GENERIC_APP_TOKENS and (r in t or t in r):
-                    return True
-    return False
+    return bool(r_set.intersection(t_set))
 
 
 class Config:

@@ -27,6 +27,10 @@ if ((Test-Path $BuildPy) -and (Test-Path $VenvPy)) {
     if ($needsBuild) {
         Write-Host "Rebuilding $DisplayName from source..." -ForegroundColor Yellow
         & $VenvPy $BuildPy
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error: build failed (exit code $LASTEXITCODE)." -ForegroundColor Red
+            exit 1
+        }
         $SourceExe = Join-Path $SourceDir "dist\TuneshineWindows.exe"
     }
 }

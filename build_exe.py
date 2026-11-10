@@ -42,6 +42,7 @@ def build():
         print("\nSUCCESS! Executable built at: dist/TuneshineWindows.exe")
     else:
         print("\nBuild failed with code", res.returncode)
+        sys.exit(res.returncode)
 
 
 if __name__ == "__main__":
