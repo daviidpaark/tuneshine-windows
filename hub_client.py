@@ -95,7 +95,8 @@ class HubClient:
                 webp_bytes = convert_to_tuneshine_webp(image_bytes)
                 files = {
                     "image": ("cover.webp", webp_bytes, "image/webp"),
-                    "metadata": (None, json.dumps(metadata), "application/json"),
+                    # Hold artwork during the device's scheduled sleep instead of lighting the display
+                    "metadata": (None, json.dumps({**metadata, "showDuringSleep": False}), "application/json"),
                 }
             else:
                 # Hub mode: offload conversion to Hub Docker container

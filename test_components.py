@@ -158,6 +158,25 @@ class TestTuneshineWindows(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_direct_mode_holds_artwork_during_sleep(self):
+        from PIL import Image
+        import io
+
+        async def run_test():
+            buf = io.BytesIO()
+            Image.new("RGB", (100, 100), (255, 0, 0)).save(buf, format="PNG")
+            client = HubClient("http://192.168.1.100", mode="direct")
+            client.client.post = AsyncMock(return_value=MagicMock(status_code=200))
+
+            await client.send_playing(buf.getvalue(), "Song Title", "Artist", "Album")
+            meta = json.loads(client.client.post.call_args.kwargs["files"]["metadata"][1])
+            self.assertIs(meta["showDuringSleep"], False)
+            self.assertEqual(meta["trackName"], "Song Title")
+
+            await client.close()
+
+        asyncio.run(run_test())
+
     def test_track_info_summary(self):
         idle_track = TrackInfo(is_playing=False)
         self.assertEqual(idle_track.summary, "Idle / Paused")
